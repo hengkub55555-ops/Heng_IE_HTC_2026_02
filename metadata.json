@@ -1,0 +1,6 @@
+{
+  "name": "Production & Efficiency OEC Dashboard",
+  "description": "Production & Efficiency OEC (生产&效率日清) dashboard with Excel/CSV file sync, inline editing, and executive plant manager reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

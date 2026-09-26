@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDashboardPayload(data) {
+      return data.lines is list && data.lines.size() <= 50 &&
+             data.days is list && data.days.size() <= 40;
+    }
+
+    // Production & Efficiency OEC Dashboard documents
+    // Public/team collaborative access for factory manager and line supervisors
+    match /oec_dashboard/{docId} {
+      allow read: if isValidId(docId);
+      allow write: if isValidId(docId) && isValidDashboardPayload(request.resource.data);
+    }
+  }
+}

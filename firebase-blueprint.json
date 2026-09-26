@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OEC Production & Efficiency Database Schema",
+  "description": "Real-time production and efficiency data for plant manager operations",
+  "entities": {
+    "OecDashboardState": {
+      "title": "OEC Dashboard State",
+      "description": "Complete daily matrix, monthly efficiency data, and action items",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "plant": { "type": "string" },
+        "year": { "type": "number" },
+        "month": { "type": "string" },
+        "lines": { "type": "array" },
+        "days": { "type": "array" },
+        "monthlyEfficiency": { "type": "array" },
+        "actionItems": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "lines", "days"]
+    }
+  },
+  "firestore": {
+    "/oec_dashboard/{docId}": {
+      "schema": "OecDashboardState",
+      "description": "Live production dashboard documents synchronized in real time across all online clients"
+    }
+  }
+}
