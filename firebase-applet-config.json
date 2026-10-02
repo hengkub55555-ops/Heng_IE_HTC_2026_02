@@ -1,12 +1,12 @@
 {
-  "projectId": "vivid-rock-62t1j",
-  "appId": "1:173550754520:web:4b551f0b48c965b729d5ad",
-  "apiKey": "AIzaSyBI1le78gfS1dH8KbUP8tFzMKXU52aVnHo",
-  "authDomain": "vivid-rock-62t1j.firebaseapp.com",
+  "projectId": "gen-lang-client-0395306552",
+  "appId": "1:1087835686152:web:c3c416ed5c4f6fee27d8bd",
+  "apiKey": "AIzaSyAoYH6HAVMcZjXxgvfJzoYSx7IR1Wt3tvw",
+  "authDomain": "gen-lang-client-0395306552.firebaseapp.com",
+  "storageBucket": "gen-lang-client-0395306552.firebasestorage.app",
+  "messagingSenderId": "1087835686152",
   "firestoreDatabaseId": "ai-studio-productioneffici-3d168824-f6ba-474f-bf1f-de7cce08b63b",
-  "storageBucket": "vivid-rock-62t1j.firebasestorage.app",
-  "messagingSenderId": "173550754520",
   "measurementId": "",
-  "oAuthClientId": "173550754520-l3c7k5bjpnm6qchs9gnf09snm7bpg37u.apps.googleusercontent.com",
+  "oAuthClientId": "1087835686152-2a2qk9gu44dj2ljm53vj31nag9573dvm.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

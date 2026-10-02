@@ -19,9 +19,11 @@ import {
   Share2,
   Copy,
   Check,
-  Globe
+  Globe,
+  HardDrive
 } from 'lucide-react';
 import { OECFilterState, ActiveSheetTab } from '../types/oec';
+import { THAI_MONTHS } from '../utils/dateHelper';
 
 interface HeaderProps {
   filters: OECFilterState;
@@ -44,6 +46,8 @@ interface HeaderProps {
   lastSyncTime?: Date | null;
   onManualSync?: () => void;
   onOpenPublish?: () => void;
+  onOpenGoogleDrive?: () => void;
+  onOpenDatePeriod?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -67,6 +71,8 @@ export const Header: React.FC<HeaderProps> = ({
   lastSyncTime = null,
   onManualSync,
   onOpenPublish,
+  onOpenGoogleDrive,
+  onOpenDatePeriod,
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -121,14 +127,38 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
+              {/* Google Drive Cloud Backup Button */}
+              {onOpenGoogleDrive && (
+                <button
+                  onClick={onOpenGoogleDrive}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-[#0070c0] hover:from-emerald-700 hover:to-[#005a9c] text-white rounded text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  title="เปิดระบบสำรองข้อมูลและกู้คืนฐานข้อมูลผ่าน Google Drive บน Web"
+                >
+                  <HardDrive className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Google Drive (สำรอง DB)</span>
+                </button>
+              )}
+
+              {/* Date & Period Manager Button */}
+              {onOpenDatePeriod && (
+                <button
+                  onClick={onOpenDatePeriod}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-800 rounded text-xs font-semibold border border-slate-300 shadow-2xs transition-colors cursor-pointer"
+                  title="จัดการวัน เดือน ปี สำหรับใส่ข้อมูลและสร้างตารางวันทำการ"
+                >
+                  <Calendar className="w-3.5 h-3.5 text-[#0070c0]" />
+                  <span>จัดการ วัน/เดือน/ปี</span>
+                </button>
+              )}
+
               {onOpenPublish && (
                 <button
                   onClick={onOpenPublish}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#005a9c] to-[#0070c0] hover:from-[#004c84] hover:to-[#005a9c] text-white rounded text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-bold shadow-xs transition-all cursor-pointer"
                   title="ดูข้อมูลการเผยแพร่ออนไลน์และคัดลอกลิงก์สำหรับแชร์ให้ผู้จัดการ"
                 >
                   <Globe className="w-3.5 h-3.5 text-sky-200" />
-                  <span>เผยแพร่ออนไลน์ (Publish)</span>
+                  <span>เผยแพร่ออนไลน์</span>
                 </button>
               )}
 
@@ -168,36 +198,40 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Year Dropdown */}
             <div className="flex flex-col">
-              <label className="text-[11px] font-semibold text-slate-600 mb-0.5">Year</label>
+              <label className="text-[11px] font-semibold text-slate-600 mb-0.5">Year (ปี)</label>
               <select
                 value={filters.year}
-                onChange={e => onFilterChange({ ...filters, year: Number(e.target.value) })}
+                onChange={e => {
+                  const y = Number(e.target.value);
+                  const newMonth = filters.month === 'All' ? 'All' : `${y}-${filters.month.split('-')[1] || '09'}`;
+                  onFilterChange({ ...filters, year: y, month: newMonth });
+                }}
                 className="bg-slate-100 hover:bg-slate-200/80 border border-slate-300 text-slate-800 text-xs font-medium rounded px-3 py-1.5 min-w-[90px] focus:outline-none focus:ring-2 focus:ring-[#0070c0] transition-colors cursor-pointer"
               >
-                <option value={2026}>2026</option>
-                <option value={2025}>2025</option>
                 <option value={2024}>2024</option>
+                <option value={2025}>2025</option>
+                <option value={2026}>2026</option>
+                <option value={2027}>2027</option>
+                <option value={2028}>2028</option>
+                <option value={2029}>2029</option>
+                <option value={2030}>2030</option>
               </select>
             </div>
 
             {/* Month Dropdown */}
             <div className="flex flex-col">
-              <label className="text-[11px] font-semibold text-slate-600 mb-0.5">Month</label>
+              <label className="text-[11px] font-semibold text-slate-600 mb-0.5">Month (เดือน)</label>
               <select
                 value={filters.month}
                 onChange={e => onFilterChange({ ...filters, month: e.target.value })}
-                className="bg-slate-100 hover:bg-slate-200/80 border border-slate-300 text-slate-800 text-xs font-medium rounded px-3 py-1.5 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-[#0070c0] transition-colors cursor-pointer"
+                className="bg-slate-100 hover:bg-slate-200/80 border border-slate-300 text-slate-800 text-xs font-medium rounded px-3 py-1.5 min-w-[150px] focus:outline-none focus:ring-2 focus:ring-[#0070c0] transition-colors cursor-pointer"
               >
-                <option value="All">การเลือกหลายรายการ</option>
-                <option value="2026-09">2026-09 (กันยายน)</option>
-                <option value="2026-08">2026-08 (สิงหาคม)</option>
-                <option value="2026-07">2026-07 (กรกฎาคม)</option>
-                <option value="2026-06">2026-06 (มิถุนายน)</option>
-                <option value="2026-05">2026-05 (พฤษภาคม)</option>
-                <option value="2026-04">2026-04 (เมษายน)</option>
-                <option value="2026-03">2026-03 (มีนาคม)</option>
-                <option value="2026-02">2026-02 (กุมภาพันธ์)</option>
-                <option value="2026-01">2026-01 (มกราคม)</option>
+                <option value="All">ทุกเดือน (All Months)</option>
+                {THAI_MONTHS.map(m => (
+                  <option key={m.value} value={`${filters.year}-${m.value}`}>
+                    {filters.year}-{m.value} {m.label}
+                  </option>
+                ))}
               </select>
             </div>
 

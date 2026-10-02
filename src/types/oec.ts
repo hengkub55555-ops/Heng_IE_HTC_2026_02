@@ -62,7 +62,16 @@ export interface ActionItem {
 export interface OECFilterState {
   plant: string;
   year: number;
-  month: string; // 'All' or '2026-09'
+  month: string; // 'All' or '2026-09', '2026-10', etc.
   prodLine: string; // 'All' or specific line
+  selectedDay?: number | 'All';
+  selectedDate?: string; // YYYY-MM-DD
+}
+
+export interface PeriodStorageState {
+  [periodKey: string]: {
+    lines: LineOECData[];
+    days: DayColumn[];
+  };
 }
 

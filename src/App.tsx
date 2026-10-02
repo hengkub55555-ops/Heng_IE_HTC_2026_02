@@ -12,6 +12,9 @@ import { ImportModal } from './components/ImportModal';
 import { PresentationModal } from './components/PresentationModal';
 import { AddLineModal } from './components/AddLineModal';
 import { PublishModal } from './components/PublishModal';
+import { GoogleDriveModal } from './components/GoogleDriveModal';
+import { DatePeriodModal } from './components/DatePeriodModal';
+import { FullDatabaseBackupPayload } from './services/googleDrive';
 import {
   INITIAL_DAYS,
   INITIAL_LINE_DATA,
@@ -248,6 +251,8 @@ export default function App() {
   const [showPresentationModal, setShowPresentationModal] = useState<boolean>(false);
   const [showAddLineModal, setShowAddLineModal] = useState<boolean>(false);
   const [showPublishModal, setShowPublishModal] = useState<boolean>(false);
+  const [showGoogleDriveModal, setShowGoogleDriveModal] = useState<boolean>(false);
+  const [showDatePeriodModal, setShowDatePeriodModal] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   // Cloud Firestore Online Sync States
@@ -546,6 +551,36 @@ export default function App() {
     }
   };
 
+  // Restore complete database snapshot from Google Drive
+  const handleRestoreDatabase = (backup: FullDatabaseBackupPayload) => {
+    if (backup.lines && backup.lines.length > 0) setLines(backup.lines);
+    if (backup.days && backup.days.length > 0) setDays(backup.days);
+    if (backup.monthlyEfficiency && backup.monthlyEfficiency.length > 0) {
+      setMonthlyEfficiency(backup.monthlyEfficiency);
+    }
+    if (backup.actionItems && backup.actionItems.length > 0) {
+      setActionItems(backup.actionItems);
+    }
+    if (backup.year) {
+      setFilters(prev => ({
+        ...prev,
+        year: backup.year,
+        month: backup.month || prev.month,
+        plant: backup.plant || prev.plant,
+      }));
+    }
+
+    // Persist to Cloud Firestore immediately
+    syncToCloud({
+      lines: backup.lines,
+      days: backup.days,
+      monthlyEfficiency: backup.monthlyEfficiency,
+      actionItems: backup.actionItems,
+    });
+
+    showToast('กู้คืนฐานข้อมูลจาก Google Drive เรียบร้อยแล้ว!');
+  };
+
   const handleUpdateMonthlyEfficiency = (newData: MonthlyEfficiencyRow[]) => {
     setMonthlyEfficiency(newData);
     syncToCloud({ monthlyEfficiency: newData });
@@ -600,6 +635,8 @@ export default function App() {
         lastSyncTime={lastSyncTime}
         onManualSync={() => syncToCloud()}
         onOpenPublish={() => setShowPublishModal(true)}
+        onOpenGoogleDrive={() => setShowGoogleDriveModal(true)}
+        onOpenDatePeriod={() => setShowDatePeriodModal(true)}
       />
 
       {/* Main Dashboard Content */}
@@ -633,6 +670,7 @@ export default function App() {
               onAddDay={handleAddDay}
               onDeleteLine={handleDeleteLine}
               isEditMode={isEditMode}
+              onOpenDatePeriod={() => setShowDatePeriodModal(true)}
             />
           </>
         ) : (
@@ -673,7 +711,6 @@ export default function App() {
         monthlyEfficiency={dynamicMonthlyEfficiency}
       />
 
-
       <AddLineModal
         isOpen={showAddLineModal}
         onClose={() => setShowAddLineModal(false)}
@@ -687,6 +724,30 @@ export default function App() {
         onClose={() => setShowPublishModal(false)}
         isOnline={isOnline}
         lastSyncTime={lastSyncTime}
+      />
+
+      <GoogleDriveModal
+        isOpen={showGoogleDriveModal}
+        onClose={() => setShowGoogleDriveModal(false)}
+        currentLines={lines}
+        currentDays={days}
+        currentMonthlyEfficiency={monthlyEfficiency}
+        currentActionItems={actionItems}
+        filters={filters}
+        onRestoreDatabase={handleRestoreDatabase}
+      />
+
+      <DatePeriodModal
+        isOpen={showDatePeriodModal}
+        onClose={() => setShowDatePeriodModal(false)}
+        filters={filters}
+        onFilterChange={setFilters}
+        currentDays={days}
+        onSetDays={(newDays) => {
+          setDays(newDays);
+          syncToCloud({ days: newDays });
+        }}
+        onAddDay={handleAddDay}
       />
     </div>
   );

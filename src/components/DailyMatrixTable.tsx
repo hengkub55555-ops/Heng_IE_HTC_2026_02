@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DayColumn, LineOECData, CategoryType } from '../types/oec';
-import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, Clock, Target, Zap } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, Clock, Target, Zap, Calendar } from 'lucide-react';
+import { getWeekdayName } from '../utils/dateHelper';
 
 interface DailyMatrixTableProps {
   days: DayColumn[];
@@ -9,6 +10,7 @@ interface DailyMatrixTableProps {
   onAddDay: (day: number, weekday: string) => void;
   onDeleteLine: (lineId: string) => void;
   isEditMode: boolean;
+  onOpenDatePeriod?: () => void;
 }
 
 export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
@@ -18,6 +20,7 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
   onAddDay,
   onDeleteLine,
   isEditMode,
+  onOpenDatePeriod,
 }) => {
   const [editingCell, setEditingCell] = useState<{
     lineId: string;
@@ -75,9 +78,20 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
         </div>
 
         <div className="flex items-center gap-2 text-xs">
+          {onOpenDatePeriod && (
+            <button
+              onClick={onOpenDatePeriod}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-slate-50 text-[#0070c0] border border-blue-200 rounded font-semibold transition-colors shadow-2xs cursor-pointer"
+              title="จัดการวัน เดือน ปี และสร้างตารางวันทำการทั้งเดือนอัตโนมัติ"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>จัดการ วัน/เดือน/ปี</span>
+            </button>
+          )}
+
           <button
             onClick={() => setShowAddDayForm(!showAddDayForm)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded font-medium transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded font-medium transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 text-blue-600" />
             <span>เพิ่มคอลัมน์วัน</span>
@@ -89,6 +103,21 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
       {showAddDayForm && (
         <div className="bg-blue-50/70 border-b border-blue-200 p-3 flex flex-wrap items-center gap-3 text-xs">
           <span className="font-semibold text-blue-900">เพิ่มวันในตาราง:</span>
+          
+          <div className="flex items-center gap-1.5">
+            <label className="text-slate-600">เลือกจากปฏิทิน:</label>
+            <input
+              type="date"
+              onChange={e => {
+                if (!e.target.value) return;
+                const [y, m, d] = e.target.value.split('-').map(Number);
+                setNewDayNum(d);
+                setNewDayWeekday(getWeekdayName(y, m, d));
+              }}
+              className="bg-white border border-slate-300 rounded px-2 py-1 text-slate-800"
+            />
+          </div>
+
           <div className="flex items-center gap-1.5">
             <label className="text-slate-600">วันที่:</label>
             <input
@@ -122,13 +151,13 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
               setNewDayNum(newDayNum + 1);
               setShowAddDayForm(false);
             }}
-            className="px-3 py-1 bg-[#0070c0] hover:bg-[#005ba3] text-white rounded font-medium shadow-xs"
+            className="px-3 py-1 bg-[#0070c0] hover:bg-[#005ba3] text-white rounded font-medium shadow-xs cursor-pointer"
           >
             ยืนยันเพิ่มวัน
           </button>
           <button
             onClick={() => setShowAddDayForm(false)}
-            className="px-2.5 py-1 text-slate-600 hover:text-slate-800"
+            className="px-2.5 py-1 text-slate-600 hover:text-slate-800 cursor-pointer"
           >
             ยกเลิก
           </button>
