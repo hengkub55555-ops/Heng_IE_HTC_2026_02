@@ -72,6 +72,24 @@ export interface PeriodStorageState {
   [periodKey: string]: {
     lines: LineOECData[];
     days: DayColumn[];
+    updatedAt?: string;
+    note?: string;
   };
+}
+
+export interface WebSavedSnapshot {
+  id: string;
+  title: string;
+  savedAt: string;
+  year: number;
+  month: string;
+  plant: string;
+  totalPlan: number;
+  totalAct: number;
+  overallUph: number;
+  lines: LineOECData[];
+  days: DayColumn[];
+  monthlyEfficiency: MonthlyEfficiencyRow[];
+  actionItems: ActionItem[];
 }
 

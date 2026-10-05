@@ -10,7 +10,14 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { LineOECData, DayColumn, MonthlyEfficiencyRow, ActionItem } from '../types/oec';
+import { 
+  LineOECData, 
+  DayColumn, 
+  MonthlyEfficiencyRow, 
+  ActionItem, 
+  PeriodStorageState, 
+  WebSavedSnapshot 
+} from '../types/oec';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
@@ -76,6 +83,8 @@ export interface CloudDashboardPayload {
   days: DayColumn[];
   monthlyEfficiency: MonthlyEfficiencyRow[];
   actionItems: ActionItem[];
+  periodData?: PeriodStorageState;
+  webSnapshots?: WebSavedSnapshot[];
   updatedAt?: string;
   updatedBy?: string;
 }

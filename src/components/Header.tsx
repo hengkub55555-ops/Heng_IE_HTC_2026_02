@@ -20,7 +20,9 @@ import {
   Copy,
   Check,
   Globe,
-  HardDrive
+  HardDrive,
+  Save,
+  History
 } from 'lucide-react';
 import { OECFilterState, ActiveSheetTab } from '../types/oec';
 import { THAI_MONTHS } from '../utils/dateHelper';
@@ -48,6 +50,10 @@ interface HeaderProps {
   onOpenPublish?: () => void;
   onOpenGoogleDrive?: () => void;
   onOpenDatePeriod?: () => void;
+  onSaveOnWeb?: () => void;
+  onOpenWebSaveModal?: () => void;
+  hasUnsavedChanges?: boolean;
+  savedPeriodsCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -73,6 +79,10 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPublish,
   onOpenGoogleDrive,
   onOpenDatePeriod,
+  onSaveOnWeb,
+  onOpenWebSaveModal,
+  hasUnsavedChanges = false,
+  savedPeriodsCount = 1,
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -115,15 +125,44 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>{isSyncing ? 'กำลังซิงค์...' : 'ออนไลน์ (Cloud Live)'}</span>
               </div>
 
+              {/* Prominent Save on Web Button */}
+              {onSaveOnWeb && (
+                <button
+                  onClick={onSaveOnWeb}
+                  disabled={isSyncing}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-bold shadow-xs transition-all cursor-pointer ${
+                    hasUnsavedChanges
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300 animate-pulse'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                  title="บันทึกข้อมูลลงบน Web Database ทันที (Ctrl + S)"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSyncing ? 'กำลังบันทึก...' : hasUnsavedChanges ? 'บันทึกบน Web (มีการแก้ไข)*' : 'บันทึกบน Web'}</span>
+                </button>
+              )}
+
+              {/* Web Save Manager / History Button */}
+              {onOpenWebSaveModal && (
+                <button
+                  onClick={onOpenWebSaveModal}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded text-xs font-semibold border border-emerald-200 transition-colors cursor-pointer"
+                  title="ดูข้อมูลที่บันทึกไว้บน Web แยกตามเดือน/ปี และประวัติการบันทึก"
+                >
+                  <History className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>ข้อมูลที่บันทึกบน Web ({savedPeriodsCount})</span>
+                </button>
+              )}
+
               {onManualSync && (
                 <button
                   onClick={onManualSync}
                   disabled={isSyncing}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium border border-slate-300 transition-colors"
-                  title="บันทึกข้อมูลล่าสุดขึ้น Cloud Firestore ทันที"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium border border-slate-300 transition-colors cursor-pointer"
+                  title="ซิงค์ข้อมูลล่าสุดขึ้น Cloud Firestore ทันที"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">ซิงค์คลาวด์</span>
+                  <span className="hidden xl:inline">ซิงค์คลาวด์</span>
                 </button>
               )}
 

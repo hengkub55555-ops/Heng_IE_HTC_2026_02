@@ -14,7 +14,9 @@ import { AddLineModal } from './components/AddLineModal';
 import { PublishModal } from './components/PublishModal';
 import { GoogleDriveModal } from './components/GoogleDriveModal';
 import { DatePeriodModal } from './components/DatePeriodModal';
+import { WebSaveModal } from './components/WebSaveModal';
 import { FullDatabaseBackupPayload } from './services/googleDrive';
+import { generateMonthDayColumns, formatPeriodLabel, THAI_MONTHS } from './utils/dateHelper';
 import {
   INITIAL_DAYS,
   INITIAL_LINE_DATA,
@@ -28,7 +30,9 @@ import {
   ActionItem, 
   OECFilterState,
   MonthlyEfficiencyRow,
-  ActiveSheetTab
+  ActiveSheetTab,
+  PeriodStorageState,
+  WebSavedSnapshot
 } from './types/oec';
 import { SummaryEfficiencyView } from './components/SummaryEfficiencyView';
 import { downloadOECTemplate, exportToCSV } from './utils/excelHelper';
@@ -49,6 +53,8 @@ export default function App() {
   const STORAGE_KEY_ACTIONS = 'oec_actions_v1';
   const STORAGE_KEY_EFFICIENCY = 'oec_monthly_efficiency_v1';
   const STORAGE_KEY_TAB = 'oec_active_tab_v1';
+  const STORAGE_KEY_PERIODS = 'oec_period_data_v1';
+  const STORAGE_KEY_SNAPSHOTS = 'oec_web_snapshots_v1';
 
   // Sheet Tab State
   const [activeTab, setActiveTab] = useState<ActiveSheetTab>(() => {
@@ -88,6 +94,40 @@ export default function App() {
     }
   });
 
+  const [periodData, setPeriodData] = useState<PeriodStorageState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_PERIODS);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return {
+      '2026-09': {
+        lines: INITIAL_LINE_DATA,
+        days: INITIAL_DAYS,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+  });
+
+  const [webSnapshots, setWebSnapshots] = useState<WebSavedSnapshot[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SNAPSHOTS);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [filters, setFilters] = useState<OECFilterState>({
+    plant: 'ทั้งหมด',
+    year: 2026,
+    month: 'All',
+    prodLine: 'All',
+  });
+
+  const activePeriodKey = filters.month === 'All' ? `${filters.year}-09` : filters.month;
+
   // Dynamically compute monthly production linked directly to table edits
   const dynamicMonthlyProd = useMemo(() => {
     const lineA = lines.find(l => l.prodLine.toLowerCase().includes('a')) || lines[0];
@@ -111,8 +151,8 @@ export default function App() {
     }
 
     return monthlyEfficiency.map(item => {
-      // Sync the active month (2026-09) with the live sum from the Daily Table
-      if (item.month === '2026-09') {
+      // Sync the active month with the live sum from the Daily Table
+      if (item.month === activePeriodKey) {
         return {
           month: item.month,
           lineA: liveLineAAct > 0 ? liveLineAAct : item.lineAAct,
@@ -125,7 +165,7 @@ export default function App() {
         lineB: item.lineBAct,
       };
     });
-  }, [monthlyEfficiency, lines, days]);
+  }, [monthlyEfficiency, lines, days, activePeriodKey]);
 
   // Dynamically compute monthly UPH linked directly to table edits
   const dynamicMonthlyUph = useMemo(() => {
@@ -159,8 +199,8 @@ export default function App() {
     const liveLineBUph = liveLineBWorkHours > 0 ? Math.round(liveLineBAct / liveLineBWorkHours) : 0;
 
     return monthlyEfficiency.map(item => {
-      // Sync the active month (2026-09) with the live UPH from the Daily Table
-      if (item.month === '2026-09') {
+      // Sync the active month with the live UPH from the Daily Table
+      if (item.month === activePeriodKey) {
         return {
           month: item.month,
           lineA: liveLineAUph > 0 ? liveLineAUph : item.lineAUph,
@@ -173,22 +213,26 @@ export default function App() {
         lineB: item.lineBUph,
       };
     });
-  }, [monthlyEfficiency, lines, days]);
+  }, [monthlyEfficiency, lines, days, activePeriodKey]);
 
-  // Dynamically compute full monthly efficiency with live September values from Daily Table
+  // Dynamically compute full monthly efficiency with live values from Daily Table
   const dynamicMonthlyEfficiency = useMemo(() => {
     const lineA = lines.find(l => l.prodLine.toLowerCase().includes('a')) || lines[0];
     const lineB = lines.find(l => l.prodLine.toLowerCase().includes('b')) || lines[1];
 
+    let liveLineAPlan = 0;
     let liveLineAAct = 0;
     let liveLineAWorkHours = 0;
+    let liveLineBPlan = 0;
     let liveLineBAct = 0;
     let liveLineBWorkHours = 0;
 
     if (lineA) {
       days.forEach(d => {
+        const p = lineA.planning[d.day];
         const a = lineA.act[d.day];
         const wt = lineA.workTime[d.day];
+        if (p !== null && p !== undefined) liveLineAPlan += Number(p);
         if (a !== null && a !== undefined) liveLineAAct += Number(a);
         if (wt !== null && wt !== undefined) liveLineAWorkHours += Number(wt);
       });
@@ -196,9 +240,11 @@ export default function App() {
 
     if (lineB) {
       days.forEach(d => {
-        const b = lineB.act[d.day];
+        const p = lineB.planning[d.day];
+        const a = lineB.act[d.day];
         const wt = lineB.workTime[d.day];
-        if (b !== null && b !== undefined) liveLineBAct += Number(b);
+        if (p !== null && p !== undefined) liveLineBPlan += Number(p);
+        if (a !== null && a !== undefined) liveLineBAct += Number(a);
         if (wt !== null && wt !== undefined) liveLineBWorkHours += Number(wt);
       });
     }
@@ -207,20 +253,24 @@ export default function App() {
     const liveLineBUph = liveLineBWorkHours > 0 ? Math.round(liveLineBAct / liveLineBWorkHours) : 0;
 
     return monthlyEfficiency.map(item => {
-      if (item.month === '2026-09') {
+      if (item.month === activePeriodKey) {
+        const lineAPlan = liveLineAPlan > 0 ? liveLineAPlan : item.lineAPlan;
         const lineAAct = liveLineAAct > 0 ? liveLineAAct : item.lineAAct;
         const lineAUph = liveLineAUph > 0 ? liveLineAUph : item.lineAUph;
         const lineAWorkHours = liveLineAWorkHours > 0 ? liveLineAWorkHours : item.lineAWorkHours;
 
+        const lineBPlan = liveLineBPlan > 0 ? liveLineBPlan : item.lineBPlan;
         const lineBAct = liveLineBAct > 0 ? liveLineBAct : item.lineBAct;
         const lineBUph = liveLineBUph > 0 ? liveLineBUph : item.lineBUph;
         const lineBWorkHours = liveLineBWorkHours > 0 ? liveLineBWorkHours : item.lineBWorkHours;
 
         return {
           ...item,
+          lineAPlan,
           lineAAct,
           lineAUph,
           lineAWorkHours,
+          lineBPlan,
           lineBAct,
           lineBUph,
           lineBWorkHours,
@@ -228,7 +278,7 @@ export default function App() {
       }
       return item;
     });
-  }, [monthlyEfficiency, lines, days]);
+  }, [monthlyEfficiency, lines, days, activePeriodKey]);
 
   const [actionItems, setActionItems] = useState<ActionItem[]>(() => {
     try {
@@ -239,20 +289,15 @@ export default function App() {
     }
   });
 
-  const [filters, setFilters] = useState<OECFilterState>({
-    plant: 'ทั้งหมด',
-    year: 2026,
-    month: 'All',
-    prodLine: 'All',
-  });
-
   const [isEditMode, setIsEditMode] = useState<boolean>(true);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
   const [showPresentationModal, setShowPresentationModal] = useState<boolean>(false);
   const [showAddLineModal, setShowAddLineModal] = useState<boolean>(false);
   const [showPublishModal, setShowPublishModal] = useState<boolean>(false);
   const [showGoogleDriveModal, setShowGoogleDriveModal] = useState<boolean>(false);
   const [showDatePeriodModal, setShowDatePeriodModal] = useState<boolean>(false);
+  const [showWebSaveModal, setShowWebSaveModal] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   // Cloud Firestore Online Sync States
@@ -271,6 +316,8 @@ export default function App() {
         days: override?.days ?? days,
         monthlyEfficiency: override?.monthlyEfficiency ?? monthlyEfficiency,
         actionItems: override?.actionItems ?? actionItems,
+        periodData: override?.periodData ?? periodData,
+        webSnapshots: override?.webSnapshots ?? webSnapshots,
       });
       setLastSyncTime(new Date());
       setIsOnline(true);
@@ -285,7 +332,8 @@ export default function App() {
     currentLines: LineOECData[],
     currentDays: DayColumn[],
     currentEff: MonthlyEfficiencyRow[],
-    currentActions: ActionItem[]
+    currentActions: ActionItem[],
+    currentPeriods?: PeriodStorageState
   ) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     setIsSyncing(true);
@@ -296,6 +344,8 @@ export default function App() {
           days: currentDays,
           monthlyEfficiency: currentEff,
           actionItems: currentActions,
+          periodData: currentPeriods ?? periodData,
+          webSnapshots,
         });
         setLastSyncTime(new Date());
         setIsOnline(true);
@@ -319,12 +369,16 @@ export default function App() {
       days,
       monthlyEfficiency,
       actionItems,
+      periodData,
+      webSnapshots,
     }).then(cloudData => {
       if (cloudData) {
         if (cloudData.lines && cloudData.lines.length > 0) setLines(cloudData.lines);
         if (cloudData.days && cloudData.days.length > 0) setDays(cloudData.days);
         if (cloudData.monthlyEfficiency && cloudData.monthlyEfficiency.length > 0) setMonthlyEfficiency(cloudData.monthlyEfficiency);
         if (cloudData.actionItems && cloudData.actionItems.length > 0) setActionItems(cloudData.actionItems);
+        if (cloudData.periodData) setPeriodData(cloudData.periodData);
+        if (cloudData.webSnapshots) setWebSnapshots(cloudData.webSnapshots);
       }
     });
 
@@ -343,6 +397,12 @@ export default function App() {
         }
         if (cloudData.actionItems) {
           setActionItems(cloudData.actionItems);
+        }
+        if (cloudData.periodData) {
+          setPeriodData(cloudData.periodData);
+        }
+        if (cloudData.webSnapshots) {
+          setWebSnapshots(cloudData.webSnapshots);
         }
       },
       (err) => {
@@ -395,12 +455,213 @@ export default function App() {
     }
   }, [actionItems]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_PERIODS, JSON.stringify(periodData));
+    } catch (e) {
+      console.error('Error saving periodData:', e);
+    }
+  }, [periodData]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_SNAPSHOTS, JSON.stringify(webSnapshots));
+    } catch (e) {
+      console.error('Error saving webSnapshots:', e);
+    }
+  }, [webSnapshots]);
+
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => {
       setNotification(null);
     }, 4000);
   };
+
+  // Switch period (Year / Month) and load or initialize that period's data on the Web
+  const handleFilterChange = (newFilters: OECFilterState) => {
+    const oldPeriodKey = filters.month === 'All' ? `${filters.year}-09` : filters.month;
+    const newPeriodKey = newFilters.month === 'All' ? `${newFilters.year}-09` : newFilters.month;
+
+    // Save current lines & days into periodData before switching
+    const updatedPeriodData: PeriodStorageState = {
+      ...periodData,
+      [oldPeriodKey]: {
+        lines,
+        days,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    if (newPeriodKey !== oldPeriodKey) {
+      if (updatedPeriodData[newPeriodKey]) {
+        setLines(updatedPeriodData[newPeriodKey].lines);
+        setDays(updatedPeriodData[newPeriodKey].days);
+      } else if (newPeriodKey === '2026-09') {
+        setLines(INITIAL_LINE_DATA);
+        setDays(INITIAL_DAYS);
+        updatedPeriodData[newPeriodKey] = {
+          lines: INITIAL_LINE_DATA,
+          days: INITIAL_DAYS,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        // Initialize clean lines and full calendar days for the newly selected Year-Month
+        const [yStr, mStr] = newPeriodKey.split('-');
+        const yNum = parseInt(yStr || String(newFilters.year), 10);
+        const mNum = parseInt(mStr || '9', 10);
+        const generatedDays = generateMonthDayColumns(yNum, mNum);
+        const templateLines: LineOECData[] = lines.map(l => ({
+          id: l.id,
+          plant: l.plant,
+          prodLine: l.prodLine,
+          planning: {},
+          act: {},
+          workTime: {},
+        }));
+        setLines(templateLines);
+        setDays(generatedDays);
+        updatedPeriodData[newPeriodKey] = {
+          lines: templateLines,
+          days: generatedDays,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      setPeriodData(updatedPeriodData);
+      showToast(`สลับไปยังข้อมูลช่วงเวลา ${formatPeriodLabel(newFilters.year, newPeriodKey)}`);
+    }
+
+    setFilters(newFilters);
+  };
+
+  // Explicit "Save on Web" function (saves active period, updates monthly summary, creates snapshot, syncs to Cloud & LocalStorage)
+  const handleSaveOnWebNow = async (customTitle?: string) => {
+    const nowIso = new Date().toISOString();
+
+    // 1. Update periodData for activePeriodKey
+    const nextPeriodData: PeriodStorageState = {
+      ...periodData,
+      [activePeriodKey]: {
+        lines,
+        days,
+        updatedAt: nowIso,
+        note: customTitle,
+      },
+    };
+    setPeriodData(nextPeriodData);
+
+    // 2. Compute Line A and Line B totals to sync into monthlyEfficiency
+    const lineA = lines.find(l => l.prodLine.toLowerCase().includes('a')) || lines[0];
+    const lineB = lines.find(l => l.prodLine.toLowerCase().includes('b')) || lines[1];
+
+    let aPlan = 0, aAct = 0, aHours = 0;
+    let bPlan = 0, bAct = 0, bHours = 0;
+
+    if (lineA) {
+      days.forEach(d => {
+        if (lineA.planning[d.day] != null) aPlan += Number(lineA.planning[d.day]);
+        if (lineA.act[d.day] != null) aAct += Number(lineA.act[d.day]);
+        if (lineA.workTime[d.day] != null) aHours += Number(lineA.workTime[d.day]);
+      });
+    }
+    if (lineB) {
+      days.forEach(d => {
+        if (lineB.planning[d.day] != null) bPlan += Number(lineB.planning[d.day]);
+        if (lineB.act[d.day] != null) bAct += Number(lineB.act[d.day]);
+        if (lineB.workTime[d.day] != null) bHours += Number(lineB.workTime[d.day]);
+      });
+    }
+
+    const aUph = aHours > 0 ? Math.round(aAct / aHours) : 0;
+    const bUph = bHours > 0 ? Math.round(bAct / bHours) : 0;
+
+    let nextMonthlyEfficiency = [...monthlyEfficiency];
+    const existingMonthIdx = nextMonthlyEfficiency.findIndex(m => m.month === activePeriodKey);
+    if (existingMonthIdx >= 0) {
+      const existing = nextMonthlyEfficiency[existingMonthIdx];
+      nextMonthlyEfficiency[existingMonthIdx] = {
+        ...existing,
+        lineAPlan: aPlan > 0 ? aPlan : existing.lineAPlan,
+        lineAAct: aAct > 0 ? aAct : existing.lineAAct,
+        lineAUph: aUph > 0 ? aUph : existing.lineAUph,
+        lineAWorkHours: aHours > 0 ? aHours : existing.lineAWorkHours,
+        lineBPlan: bPlan > 0 ? bPlan : existing.lineBPlan,
+        lineBAct: bAct > 0 ? bAct : existing.lineBAct,
+        lineBUph: bUph > 0 ? bUph : existing.lineBUph,
+        lineBWorkHours: bHours > 0 ? bHours : existing.lineBWorkHours,
+      };
+    } else {
+      const [yPart, mPart] = activePeriodKey.split('-');
+      const mObj = THAI_MONTHS.find(m => m.value === mPart);
+      nextMonthlyEfficiency.push({
+        month: activePeriodKey,
+        monthNameTh: `${mObj ? mObj.label.split(' ')[0] : mPart} ${yPart}`,
+        lineAPlan: aPlan,
+        lineAAct: aAct,
+        lineAUph: aUph,
+        lineATargetUph: 120,
+        lineAWorkHours: aHours,
+        lineBPlan: bPlan,
+        lineBAct: bAct,
+        lineBUph: bUph,
+        lineBTargetUph: 112,
+        lineBWorkHours: bHours,
+        notes: customTitle || 'บันทึกจากตารางรายวันบน Web',
+      });
+      nextMonthlyEfficiency.sort((x, y) => x.month.localeCompare(y.month));
+    }
+    setMonthlyEfficiency(nextMonthlyEfficiency);
+
+    // 3. Create a WebSavedSnapshot entry
+    const totalPlan = aPlan + bPlan;
+    const totalAct = aAct + bAct;
+    const totalHours = aHours + bHours;
+    const overallUph = totalHours > 0 ? Math.round(totalAct / totalHours) : 0;
+
+    const newSnapshot: WebSavedSnapshot = {
+      id: `snap_${Date.now()}`,
+      title: customTitle || `บันทึกข้อมูลบน Web (${formatPeriodLabel(filters.year, activePeriodKey)})`,
+      savedAt: nowIso,
+      year: filters.year,
+      month: activePeriodKey,
+      plant: filters.plant === 'ทั้งหมด' ? 'HTC Ref(泰国冰箱)' : filters.plant,
+      totalPlan,
+      totalAct,
+      overallUph,
+      lines,
+      days,
+      monthlyEfficiency: nextMonthlyEfficiency,
+      actionItems,
+    };
+
+    const nextSnapshots = [newSnapshot, ...webSnapshots].slice(0, 15);
+    setWebSnapshots(nextSnapshots);
+    setHasUnsavedChanges(false);
+
+    // 4. Persist to Cloud Firestore & LocalStorage
+    await syncToCloud({
+      lines,
+      days,
+      monthlyEfficiency: nextMonthlyEfficiency,
+      actionItems,
+      periodData: nextPeriodData,
+      webSnapshots: nextSnapshots,
+    });
+
+    showToast(`บันทึกข้อมูลบน Web สำเร็จ! (${formatPeriodLabel(filters.year, activePeriodKey)})`);
+  };
+
+  // Global keyboard shortcut Ctrl+S / Cmd+S to Save on Web
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveOnWebNow();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
   // Available unique plants and lines
   const availablePlants = useMemo(() => {
@@ -486,18 +747,39 @@ export default function App() {
       };
     });
     setLines(updatedLines);
-    debouncedCloudSave(updatedLines, days, monthlyEfficiency, actionItems);
+    setHasUnsavedChanges(true);
+
+    const nextPeriodData: PeriodStorageState = {
+      ...periodData,
+      [activePeriodKey]: {
+        lines: updatedLines,
+        days,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    setPeriodData(nextPeriodData);
+    debouncedCloudSave(updatedLines, days, monthlyEfficiency, actionItems, nextPeriodData);
   };
 
   // Add a new day column
   const handleAddDay = (day: number, weekday: string) => {
     if (days.some(d => d.day === day)) {
-      alert(`วันที่ ${day} มีอยู่ในตารางแล้ว`);
+      showToast(`วันที่ ${day} มีอยู่ในตารางแล้ว`, 'info');
       return;
     }
     const updatedDays = [...days, { day, weekday }].sort((a, b) => a.day - b.day);
     setDays(updatedDays);
-    syncToCloud({ days: updatedDays });
+    setHasUnsavedChanges(true);
+    const nextPeriodData: PeriodStorageState = {
+      ...periodData,
+      [activePeriodKey]: {
+        lines,
+        days: updatedDays,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    setPeriodData(nextPeriodData);
+    syncToCloud({ days: updatedDays, periodData: nextPeriodData });
     showToast(`เพิ่มคอลัมน์ วันที่ ${day} (${weekday}) เรียบร้อยแล้ว`);
   };
 
@@ -506,6 +788,7 @@ export default function App() {
     if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสายการผลิตนี้?')) {
       const updatedLines = lines.filter(l => l.id !== lineId);
       setLines(updatedLines);
+      setHasUnsavedChanges(true);
       syncToCloud({ lines: updatedLines });
       showToast('ลบสายการผลิตเรียบร้อย');
     }
@@ -515,6 +798,7 @@ export default function App() {
   const handleAddLine = (newLine: LineOECData) => {
     const updatedLines = [...lines, newLine];
     setLines(updatedLines);
+    setHasUnsavedChanges(true);
     syncToCloud({ lines: updatedLines });
     showToast(`เพิ่มสายการผลิต "${newLine.prodLine}" สำเร็จ`);
   };
@@ -526,8 +810,17 @@ export default function App() {
     if (importedDays && importedDays.length > 0) {
       setDays(importedDays);
     }
-    syncToCloud({ lines: importedLines, days: newDays });
-    showToast('นำเข้าและซิงค์ข้อมูล OEC บนเว็บสำเร็จเรียบร้อยแล้ว!');
+    const nextPeriodData: PeriodStorageState = {
+      ...periodData,
+      [activePeriodKey]: {
+        lines: importedLines,
+        days: newDays,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    setPeriodData(nextPeriodData);
+    syncToCloud({ lines: importedLines, days: newDays, periodData: nextPeriodData });
+    showToast('นำเข้าและบันทึกข้อมูล OEC บนเว็บสำเร็จเรียบร้อยแล้ว!');
   };
 
   // Reset to initial data from screenshot
@@ -537,6 +830,7 @@ export default function App() {
       setDays(INITIAL_DAYS);
       setMonthlyEfficiency(INITIAL_MONTHLY_EFFICIENCY);
       setActionItems(INITIAL_ACTION_ITEMS);
+      setHasUnsavedChanges(false);
       localStorage.removeItem(STORAGE_KEY_LINES);
       localStorage.removeItem(STORAGE_KEY_DAYS);
       localStorage.removeItem(STORAGE_KEY_ACTIONS);
@@ -581,8 +875,52 @@ export default function App() {
     showToast('กู้คืนฐานข้อมูลจาก Google Drive เรียบร้อยแล้ว!');
   };
 
+  // Restore from Web Saved Snapshot
+  const handleRestoreWebSnapshot = (snap: WebSavedSnapshot) => {
+    setLines(snap.lines);
+    setDays(snap.days);
+    if (snap.monthlyEfficiency && snap.monthlyEfficiency.length > 0) {
+      setMonthlyEfficiency(snap.monthlyEfficiency);
+    }
+    if (snap.actionItems) {
+      setActionItems(snap.actionItems);
+    }
+    setFilters(prev => ({
+      ...prev,
+      year: snap.year,
+      month: snap.month,
+    }));
+    const nextPeriodData: PeriodStorageState = {
+      ...periodData,
+      [snap.month]: {
+        lines: snap.lines,
+        days: snap.days,
+        updatedAt: new Date().toISOString(),
+        note: snap.title,
+      },
+    };
+    setPeriodData(nextPeriodData);
+    setHasUnsavedChanges(false);
+    syncToCloud({
+      lines: snap.lines,
+      days: snap.days,
+      monthlyEfficiency: snap.monthlyEfficiency,
+      actionItems: snap.actionItems,
+      periodData: nextPeriodData,
+    });
+    showToast(`เรียกคืนข้อมูล "${snap.title}" สำเร็จเรียบร้อยแล้ว!`);
+  };
+
+  const handleDeleteWebSnapshot = (snapId: string) => {
+    const nextSnapshots = webSnapshots.filter(s => s.id !== snapId);
+    setWebSnapshots(nextSnapshots);
+    syncToCloud({ webSnapshots: nextSnapshots });
+    showToast('ลบจุดบันทึกบน Web เรียบร้อยแล้ว');
+  };
+
   const handleUpdateMonthlyEfficiency = (newData: MonthlyEfficiencyRow[]) => {
     setMonthlyEfficiency(newData);
+    setHasUnsavedChanges(true);
     syncToCloud({ monthlyEfficiency: newData });
   };
 
@@ -616,7 +954,7 @@ export default function App() {
       {/* Header with Title & Controls */}
       <Header
         filters={filters}
-        onFilterChange={setFilters}
+        onFilterChange={handleFilterChange}
         availablePlants={availablePlants}
         availableLines={availableLines}
         activeTab={activeTab}
@@ -633,10 +971,14 @@ export default function App() {
         isOnline={isOnline}
         isSyncing={isSyncing}
         lastSyncTime={lastSyncTime}
-        onManualSync={() => syncToCloud()}
+        onManualSync={() => handleSaveOnWebNow()}
         onOpenPublish={() => setShowPublishModal(true)}
         onOpenGoogleDrive={() => setShowGoogleDriveModal(true)}
         onOpenDatePeriod={() => setShowDatePeriodModal(true)}
+        onSaveOnWeb={() => handleSaveOnWebNow()}
+        onOpenWebSaveModal={() => setShowWebSaveModal(true)}
+        hasUnsavedChanges={hasUnsavedChanges}
+        savedPeriodsCount={Object.keys(periodData).length}
       />
 
       {/* Main Dashboard Content */}
@@ -671,6 +1013,11 @@ export default function App() {
               onDeleteLine={handleDeleteLine}
               isEditMode={isEditMode}
               onOpenDatePeriod={() => setShowDatePeriodModal(true)}
+              onSaveOnWeb={() => handleSaveOnWebNow()}
+              onOpenWebSaveModal={() => setShowWebSaveModal(true)}
+              hasUnsavedChanges={hasUnsavedChanges}
+              isSyncing={isSyncing}
+              activePeriodLabel={formatPeriodLabel(filters.year, activePeriodKey)}
             />
           </>
         ) : (
@@ -741,13 +1088,40 @@ export default function App() {
         isOpen={showDatePeriodModal}
         onClose={() => setShowDatePeriodModal(false)}
         filters={filters}
-        onFilterChange={setFilters}
+        onFilterChange={handleFilterChange}
         currentDays={days}
         onSetDays={(newDays) => {
           setDays(newDays);
+          setHasUnsavedChanges(true);
           syncToCloud({ days: newDays });
         }}
         onAddDay={handleAddDay}
+      />
+
+      <WebSaveModal
+        isOpen={showWebSaveModal}
+        onClose={() => setShowWebSaveModal(false)}
+        filters={filters}
+        currentLines={lines}
+        currentDays={days}
+        currentMonthlyEfficiency={monthlyEfficiency}
+        currentActionItems={actionItems}
+        periodData={periodData}
+        webSnapshots={webSnapshots}
+        lastSyncTime={lastSyncTime}
+        isSyncing={isSyncing}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onSaveOnWebNow={handleSaveOnWebNow}
+        onSelectSavedPeriod={(periodKey) => {
+          const [yStr] = periodKey.split('-');
+          handleFilterChange({
+            ...filters,
+            year: parseInt(yStr || '2026', 10),
+            month: periodKey,
+          });
+        }}
+        onRestoreWebSnapshot={handleRestoreWebSnapshot}
+        onDeleteWebSnapshot={handleDeleteWebSnapshot}
       />
     </div>
   );

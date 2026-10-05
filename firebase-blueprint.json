@@ -16,6 +16,8 @@
         "days": { "type": "array" },
         "monthlyEfficiency": { "type": "array" },
         "actionItems": { "type": "array" },
+        "periodData": { "type": "object" },
+        "webSnapshots": { "type": "array" },
         "updatedAt": { "type": "string" }
       },
       "required": ["id", "lines", "days"]

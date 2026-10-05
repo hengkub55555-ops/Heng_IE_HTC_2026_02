@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DayColumn, LineOECData, CategoryType } from '../types/oec';
-import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, Clock, Target, Zap, Calendar } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, Clock, Target, Zap, Calendar, Save, History } from 'lucide-react';
 import { getWeekdayName } from '../utils/dateHelper';
 
 interface DailyMatrixTableProps {
@@ -11,6 +11,11 @@ interface DailyMatrixTableProps {
   onDeleteLine: (lineId: string) => void;
   isEditMode: boolean;
   onOpenDatePeriod?: () => void;
+  onSaveOnWeb?: () => void;
+  onOpenWebSaveModal?: () => void;
+  hasUnsavedChanges?: boolean;
+  isSyncing?: boolean;
+  activePeriodLabel?: string;
 }
 
 export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
@@ -21,6 +26,11 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
   onDeleteLine,
   isEditMode,
   onOpenDatePeriod,
+  onSaveOnWeb,
+  onOpenWebSaveModal,
+  hasUnsavedChanges = false,
+  isSyncing = false,
+  activePeriodLabel,
 }) => {
   const [editingCell, setEditingCell] = useState<{
     lineId: string;
@@ -32,6 +42,35 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
   const [newDayNum, setNewDayNum] = useState<number>(26);
   const [newDayWeekday, setNewDayWeekday] = useState<string>('SAT');
   const [showAddDayForm, setShowAddDayForm] = useState<boolean>(false);
+
+  // Quick Daily Entry Form State
+  const [showQuickEntry, setShowQuickEntry] = useState<boolean>(false);
+  const [quickLineId, setQuickLineId] = useState<string>(lines[0]?.id || '');
+  const [quickDay, setQuickDay] = useState<number>(days[days.length - 1]?.day || 1);
+  const [quickPlan, setQuickPlan] = useState<string>('');
+  const [quickAct, setQuickAct] = useState<string>('');
+  const [quickWorkTime, setQuickWorkTime] = useState<string>('');
+
+  const handleQuickEntrySave = () => {
+    const targetLineId = quickLineId || lines[0]?.id;
+    if (!targetLineId) return;
+
+    if (quickPlan.trim() !== '') {
+      onUpdateCellValue(targetLineId, 'planning', quickDay, Number(quickPlan));
+    }
+    if (quickAct.trim() !== '') {
+      onUpdateCellValue(targetLineId, 'act', quickDay, Number(quickAct));
+    }
+    if (quickWorkTime.trim() !== '') {
+      onUpdateCellValue(targetLineId, 'workTime', quickDay, Number(quickWorkTime));
+    }
+    if (onSaveOnWeb) {
+      setTimeout(() => onSaveOnWeb(), 100);
+    }
+    setQuickPlan('');
+    setQuickAct('');
+    setQuickWorkTime('');
+  };
 
   const handleStartEdit = (lineId: string, category: 'planning' | 'act' | 'workTime', day: number, currentVal: number | null | undefined) => {
     setEditingCell({
@@ -68,16 +107,31 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
     <div className="bg-white rounded-md border border-slate-300 shadow-sm overflow-hidden mb-6">
       {/* Table Toolbar */}
       <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-300 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-bold text-slate-700 tracking-wide uppercase">
             ตารางบันทึกข้อมูลรายวัน (Daily Production & Efficiency Matrix)
           </span>
+          {activePeriodLabel && (
+            <span className="text-[11px] font-bold text-[#0070c0] bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
+              {activePeriodLabel}
+            </span>
+          )}
           <span className="text-[11px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
             {lines.length} สายการผลิต · {days.length} วันทำการ
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {/* Quick Daily Entry Toggle */}
+          <button
+            onClick={() => setShowQuickEntry(!showQuickEntry)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded font-semibold transition-colors shadow-2xs cursor-pointer"
+            title="กรอกข้อมูลแผน ยอดผลิตจริง และชั่วโมงทำงานแบบด่วน"
+          >
+            <Edit2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>กรอกข้อมูลด่วนตามวัน</span>
+          </button>
+
           {onOpenDatePeriod && (
             <button
               onClick={onOpenDatePeriod}
@@ -96,8 +150,123 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             <Plus className="w-3.5 h-3.5 text-blue-600" />
             <span>เพิ่มคอลัมน์วัน</span>
           </button>
+
+          {onSaveOnWeb && (
+            <button
+              onClick={onSaveOnWeb}
+              disabled={isSyncing}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded font-bold shadow-xs transition-all cursor-pointer ${
+                hasUnsavedChanges
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+              title="บันทึกตารางนี้ลงบน Web ทันที"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSyncing ? 'กำลังบันทึก...' : 'บันทึกบน Web'}</span>
+            </button>
+          )}
+
+          {onOpenWebSaveModal && (
+            <button
+              onClick={onOpenWebSaveModal}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded font-medium transition-colors cursor-pointer"
+              title="ดูรายการข้อมูลที่บันทึกไว้บน Web"
+            >
+              <History className="w-3.5 h-3.5 text-emerald-600" />
+              <span>ประวัติบันทึกบน Web</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Quick Daily Data Entry Bar */}
+      {showQuickEntry && (
+        <div className="bg-emerald-50/80 border-b border-emerald-200 p-3 flex flex-wrap items-center gap-3 text-xs">
+          <span className="font-bold text-emerald-900 flex items-center gap-1">
+            <Edit2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>กรอกข้อมูลลงตาราง & บันทึกบน Web:</span>
+          </span>
+
+          <div className="flex items-center gap-1.5">
+            <label className="text-slate-700 font-medium">สายการผลิต:</label>
+            <select
+              value={quickLineId || lines[0]?.id || ''}
+              onChange={e => setQuickLineId(e.target.value)}
+              className="bg-white border border-slate-300 rounded px-2 py-1 text-slate-800 font-semibold"
+            >
+              {lines.map(l => (
+                <option key={l.id} value={l.id}>
+                  {l.plant} - {l.prodLine}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <label className="text-slate-700 font-medium">วันที่:</label>
+            <select
+              value={quickDay}
+              onChange={e => setQuickDay(Number(e.target.value))}
+              className="bg-white border border-slate-300 rounded px-2 py-1 text-slate-800 font-semibold"
+            >
+              {days.map(d => (
+                <option key={d.day} value={d.day}>
+                  วันที่ {d.day} ({d.weekday})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <label className="text-slate-700 font-medium">Planning:</label>
+            <input
+              type="number"
+              placeholder="แผนผลิต"
+              value={quickPlan}
+              onChange={e => setQuickPlan(e.target.value)}
+              className="w-24 bg-white border border-slate-300 rounded px-2 py-1 text-slate-800"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <label className="text-slate-700 font-medium">Act:</label>
+            <input
+              type="number"
+              placeholder="ผลิตจริง"
+              value={quickAct}
+              onChange={e => setQuickAct(e.target.value)}
+              className="w-24 bg-white border border-slate-300 rounded px-2 py-1 text-slate-800"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <label className="text-slate-700 font-medium">Work Time (ชม.):</label>
+            <input
+              type="number"
+              placeholder="ชม.ทำงาน"
+              value={quickWorkTime}
+              onChange={e => setQuickWorkTime(e.target.value)}
+              className="w-20 bg-white border border-slate-300 rounded px-2 py-1 text-slate-800"
+            />
+          </div>
+
+          <button
+            onClick={handleQuickEntrySave}
+            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold shadow-xs flex items-center gap-1 cursor-pointer"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>บันทึกค่าลงตาราง & บันทึกบน Web</span>
+          </button>
+
+          <button
+            onClick={() => setShowQuickEntry(false)}
+            className="px-2 py-1 text-slate-500 hover:text-slate-800 cursor-pointer"
+          >
+            ปิด
+          </button>
+        </div>
+      )}
 
       {/* Add Day Column Quick Form */}
       {showAddDayForm && (
