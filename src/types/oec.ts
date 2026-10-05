@@ -1,6 +1,6 @@
 export type CategoryType = 'Planning' | 'Act' | 'Gap' | 'Work Time' | 'UPH';
 
-export type ActiveSheetTab = 'daily-oec' | 'summary-efficiency';
+export type ActiveSheetTab = 'daily-oec' | 'daily-trend' | 'summary-efficiency';
 
 export interface DayColumn {
   day: number;

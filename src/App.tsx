@@ -8,6 +8,7 @@ import { Header } from './components/Header';
 import { KpiCards } from './components/KpiCards';
 import { OecCharts } from './components/OecCharts';
 import { DailyMatrixTable } from './components/DailyMatrixTable';
+import { DailyTrendView } from './components/DailyTrendView';
 import { ImportModal } from './components/ImportModal';
 import { PresentationModal } from './components/PresentationModal';
 import { AddLineModal } from './components/AddLineModal';
@@ -1013,6 +1014,7 @@ export default function App() {
               onDeleteLine={handleDeleteLine}
               isEditMode={isEditMode}
               onOpenDatePeriod={() => setShowDatePeriodModal(true)}
+              onOpenDailyTrend={() => setActiveTab('daily-trend')}
               onSaveOnWeb={() => handleSaveOnWebNow()}
               onOpenWebSaveModal={() => setShowWebSaveModal(true)}
               hasUnsavedChanges={hasUnsavedChanges}
@@ -1020,8 +1022,22 @@ export default function App() {
               activePeriodLabel={formatPeriodLabel(filters.year, activePeriodKey)}
             />
           </>
+        ) : activeTab === 'daily-trend' ? (
+          /* Sheet 2: Daily Trend Charts & Live Daily Data Recording Table */
+          <DailyTrendView
+            days={days}
+            lines={filteredLines}
+            periodLabel={formatPeriodLabel(filters.year, activePeriodKey)}
+            plantName={filters.plant === 'ทั้งหมด' ? 'HTC Ref(泰国冰箱)' : filters.plant}
+            onUpdateCellValue={handleUpdateCellValue}
+            onAddDay={handleAddDay}
+            onOpenDatePeriod={() => setShowDatePeriodModal(true)}
+            onSaveOnWeb={() => handleSaveOnWebNow()}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isSyncing={isSyncing}
+          />
         ) : (
-          /* Sheet 2: Summary Efficiency Line A & Line B (AVG & Actual YTD) */
+          /* Sheet 3: Summary Efficiency Line A & Line B (AVG & Actual YTD) */
           <SummaryEfficiencyView
             data={dynamicMonthlyEfficiency}
             onUpdateData={handleUpdateMonthlyEfficiency}

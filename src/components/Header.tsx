@@ -22,7 +22,8 @@ import {
   Globe,
   HardDrive,
   Save,
-  History
+  History,
+  TrendingUp
 } from 'lucide-react';
 import { OECFilterState, ActiveSheetTab } from '../types/oec';
 import { THAI_MONTHS } from '../utils/dateHelper';
@@ -292,33 +293,42 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Sheet Tabs Bar (Excel / Modern Tab Switcher) */}
-        <div className="mt-3 flex items-center justify-between border-b border-slate-200">
+        <div className="mt-3 flex items-center justify-between border-b border-slate-200 overflow-x-auto">
           <div className="flex items-center gap-1">
             <button
               onClick={() => onTabChange('daily-oec')}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 ${
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'daily-oec'
                   ? 'border-[#0070c0] text-[#0070c0] bg-blue-50/70 shadow-xs'
                   : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <TableProperties className="w-4 h-4" />
-              <span>Sheet 1: Daily OEC (生产&效率日清)</span>
+              <span>Sheet 1: Daily OEC (ตารางหลัก 生产&效率日清)</span>
+            </button>
+
+            <button
+              onClick={() => onTabChange('daily-trend')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'daily-trend'
+                  ? 'border-[#0070c0] text-[#0070c0] bg-blue-50/70 shadow-xs'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4 text-[#0070c0]" />
+              <span>Sheet 2: กราฟ & ตารางบันทึกข้อมูลรายวัน (Daily Trend & Live Record)</span>
             </button>
 
             <button
               onClick={() => onTabChange('summary-efficiency')}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 relative ${
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'summary-efficiency'
                   ? 'border-[#0070c0] text-[#0070c0] bg-blue-50/70 shadow-xs'
                   : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
             >
               <BarChart3 className="w-4 h-4 text-emerald-600" />
-              <span>Sheet 2: Summary Efficiency Line A, B (AVG & Actual YTD)</span>
-              <span className="bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-1.5 py-0.2 rounded-full">
-                NEW
-              </span>
+              <span>Sheet 3: Summary Efficiency Line A, B (AVG & Actual YTD)</span>
             </button>
           </div>
         </div>

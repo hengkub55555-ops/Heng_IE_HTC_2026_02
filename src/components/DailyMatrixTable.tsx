@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DayColumn, LineOECData, CategoryType } from '../types/oec';
-import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, Clock, Target, Zap, Calendar, Save, History } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, Clock, Target, Zap, Calendar, Save, History, TrendingUp } from 'lucide-react';
 import { getWeekdayName } from '../utils/dateHelper';
 
 interface DailyMatrixTableProps {
@@ -11,6 +11,7 @@ interface DailyMatrixTableProps {
   onDeleteLine: (lineId: string) => void;
   isEditMode: boolean;
   onOpenDatePeriod?: () => void;
+  onOpenDailyTrend?: () => void;
   onSaveOnWeb?: () => void;
   onOpenWebSaveModal?: () => void;
   hasUnsavedChanges?: boolean;
@@ -26,6 +27,7 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
   onDeleteLine,
   isEditMode,
   onOpenDatePeriod,
+  onOpenDailyTrend,
   onSaveOnWeb,
   onOpenWebSaveModal,
   hasUnsavedChanges = false,
@@ -122,6 +124,17 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs">
+          {onOpenDailyTrend && (
+            <button
+              onClick={onOpenDailyTrend}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#0070c0] hover:bg-[#005ba3] text-white rounded font-semibold transition-colors shadow-2xs cursor-pointer"
+              title="เปิดหน้ากราฟและตารางวิเคราะห์เทรนด์รายวัน"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>ดูกราฟเทรนด์รายวัน</span>
+            </button>
+          )}
+
           {/* Quick Daily Entry Toggle */}
           <button
             onClick={() => setShowQuickEntry(!showQuickEntry)}
