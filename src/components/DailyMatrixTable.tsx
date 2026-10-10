@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DayColumn, LineOECData, CategoryType } from '../types/oec';
 import { Plus, Trash2, Edit2, Check, X, ArrowUpDown, Clock, Target, Zap, Calendar, Save, History, TrendingUp } from 'lucide-react';
 import { getWeekdayName } from '../utils/dateHelper';
+import { useAppPreferences } from '../contexts/AppPreferencesContext';
 
 interface DailyMatrixTableProps {
   days: DayColumn[];
@@ -34,6 +35,7 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
   isSyncing = false,
   activePeriodLabel,
 }) => {
+  const { t } = useAppPreferences();
   const [editingCell, setEditingCell] = useState<{
     lineId: string;
     category: 'planning' | 'act' | 'workTime';
@@ -111,7 +113,11 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
       <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-300 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-bold text-slate-700 tracking-wide uppercase">
-            ตารางบันทึกข้อมูลรายวัน (Daily Production & Efficiency Matrix)
+            {t(
+              'ตารางบันทึกข้อมูลรายวัน (Daily Production & Efficiency Matrix)',
+              'Daily Production & Efficiency Matrix',
+              '每日生产与效率日清矩阵表 (Daily OEC Matrix)'
+            )}
           </span>
           {activePeriodLabel && (
             <span className="text-[11px] font-bold text-[#0070c0] bg-blue-50 px-2.5 py-0.5 rounded border border-blue-200">
@@ -119,7 +125,11 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             </span>
           )}
           <span className="text-[11px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-            {lines.length} สายการผลิต · {days.length} วันทำการ
+            {t(
+              `${lines.length} สายการผลิต · ${days.length} วันทำการ`,
+              `${lines.length} Lines · ${days.length} Working Days`,
+              `${lines.length} 条产线 · ${days.length} 个工作日`
+            )}
           </span>
         </div>
 
@@ -128,10 +138,10 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             <button
               onClick={onOpenDailyTrend}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#0070c0] hover:bg-[#005ba3] text-white rounded font-semibold transition-colors shadow-2xs cursor-pointer"
-              title="เปิดหน้ากราฟและตารางวิเคราะห์เทรนด์รายวัน"
+              title={t('เปิดหน้ากราฟและตารางวิเคราะห์เทรนด์รายวัน', 'Open Daily Trend Charts & Record View', '打开每日趋势图表与数据记录表')}
             >
               <TrendingUp className="w-3.5 h-3.5" />
-              <span>ดูกราฟเทรนด์รายวัน</span>
+              <span>{t('ดูกราฟเทรนด์รายวัน', 'Daily Trend Charts', '每日趋势图表')}</span>
             </button>
           )}
 
@@ -139,20 +149,20 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
           <button
             onClick={() => setShowQuickEntry(!showQuickEntry)}
             className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 rounded font-semibold transition-colors shadow-2xs cursor-pointer"
-            title="กรอกข้อมูลแผน ยอดผลิตจริง และชั่วโมงทำงานแบบด่วน"
+            title={t('กรอกข้อมูลแผน ยอดผลิตจริง และชั่วโมงทำงานแบบด่วน', 'Quickly input Planning, Actual & Work Time', '快速录入计划、实际产量与工时')}
           >
             <Edit2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>กรอกข้อมูลด่วนตามวัน</span>
+            <span>{t('กรอกข้อมูลด่วนตามวัน', 'Quick Daily Input', '按日快速录入')}</span>
           </button>
 
           {onOpenDatePeriod && (
             <button
               onClick={onOpenDatePeriod}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-slate-50 text-[#0070c0] border border-blue-200 rounded font-semibold transition-colors shadow-2xs cursor-pointer"
-              title="จัดการวัน เดือน ปี และสร้างตารางวันทำการทั้งเดือนอัตโนมัติ"
+              title={t('จัดการวัน เดือน ปี และสร้างตารางวันทำการทั้งเดือนอัตโนมัติ', 'Manage Date, Month, Year & Working Days', '管理日/月/年及生成全月工作日')}
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>จัดการ วัน/เดือน/ปี</span>
+              <span>{t('จัดการ วัน/เดือน/ปี', 'Date / Period', '日期/月份管理')}</span>
             </button>
           )}
 
@@ -161,7 +171,7 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded font-medium transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 text-blue-600" />
-            <span>เพิ่มคอลัมน์วัน</span>
+            <span>{t('เพิ่มคอลัมน์วัน', 'Add Day Column', '新增日期列')}</span>
           </button>
 
           {onSaveOnWeb && (
@@ -173,10 +183,14 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
                   ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white'
               }`}
-              title="บันทึกตารางนี้ลงบน Web ทันที"
+              title={t('บันทึกตารางนี้ลงบน Web ทันที', 'Save this table on Web now', '立即保存此表格至网页')}
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{isSyncing ? 'กำลังบันทึก...' : 'บันทึกบน Web'}</span>
+              <span>
+                {isSyncing
+                  ? t('กำลังบันทึก...', 'Saving...', '保存中...')
+                  : t('บันทึกบน Web', 'Save on Web', '网页保存')}
+              </span>
             </button>
           )}
 
@@ -184,10 +198,10 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             <button
               onClick={onOpenWebSaveModal}
               className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded font-medium transition-colors cursor-pointer"
-              title="ดูรายการข้อมูลที่บันทึกไว้บน Web"
+              title={t('ดูรายการข้อมูลที่บันทึกไว้บน Web', 'View Web Saved History', '查看网页保存历史记录')}
             >
               <History className="w-3.5 h-3.5 text-emerald-600" />
-              <span>ประวัติบันทึกบน Web</span>
+              <span>{t('ประวัติบันทึกบน Web', 'Web Save History', '网页保存记录')}</span>
             </button>
           )}
         </div>
@@ -198,11 +212,11 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
         <div className="bg-emerald-50/80 border-b border-emerald-200 p-3 flex flex-wrap items-center gap-3 text-xs">
           <span className="font-bold text-emerald-900 flex items-center gap-1">
             <Edit2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>กรอกข้อมูลลงตาราง & บันทึกบน Web:</span>
+            <span>{t('กรอกข้อมูลลงตาราง & บันทึกบน Web:', 'Quick Record & Save on Web:', '快速录入表格并保存至网页:')}</span>
           </span>
 
           <div className="flex items-center gap-1.5">
-            <label className="text-slate-700 font-medium">สายการผลิต:</label>
+            <label className="text-slate-700 font-medium">{t('สายการผลิต:', 'Line:', '产线:')}</label>
             <select
               value={quickLineId || lines[0]?.id || ''}
               onChange={e => setQuickLineId(e.target.value)}
@@ -217,7 +231,7 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <label className="text-slate-700 font-medium">วันที่:</label>
+            <label className="text-slate-700 font-medium">{t('วันที่:', 'Day:', '日期:')}</label>
             <select
               value={quickDay}
               onChange={e => setQuickDay(Number(e.target.value))}
@@ -225,7 +239,7 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             >
               {days.map(d => (
                 <option key={d.day} value={d.day}>
-                  วันที่ {d.day} ({d.weekday})
+                  {t(`วันที่ ${d.day} (${d.weekday})`, `Day ${d.day} (${d.weekday})`, `第 ${d.day} 日 (${d.weekday})`)}
                 </option>
               ))}
             </select>
@@ -235,7 +249,7 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             <label className="text-slate-700 font-medium">Planning:</label>
             <input
               type="number"
-              placeholder="แผนผลิต"
+              placeholder={t('แผนผลิต', 'Plan', '计划产量')}
               value={quickPlan}
               onChange={e => setQuickPlan(e.target.value)}
               className="w-24 bg-white border border-slate-300 rounded px-2 py-1 text-slate-800"
@@ -246,7 +260,7 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             <label className="text-slate-700 font-medium">Act:</label>
             <input
               type="number"
-              placeholder="ผลิตจริง"
+              placeholder={t('ผลิตจริง', 'Actual', '实际产量')}
               value={quickAct}
               onChange={e => setQuickAct(e.target.value)}
               className="w-24 bg-white border border-slate-300 rounded px-2 py-1 text-slate-800"
@@ -254,10 +268,10 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <label className="text-slate-700 font-medium">Work Time (ชม.):</label>
+            <label className="text-slate-700 font-medium">{t('Work Time (ชม.):', 'Work Time (h):', '工时 (小时):')}</label>
             <input
               type="number"
-              placeholder="ชม.ทำงาน"
+              placeholder={t('ชม.ทำงาน', 'Hours', '工时')}
               value={quickWorkTime}
               onChange={e => setQuickWorkTime(e.target.value)}
               className="w-20 bg-white border border-slate-300 rounded px-2 py-1 text-slate-800"
@@ -269,14 +283,14 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
             className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold shadow-xs flex items-center gap-1 cursor-pointer"
           >
             <Save className="w-3.5 h-3.5" />
-            <span>บันทึกค่าลงตาราง & บันทึกบน Web</span>
+            <span>{t('บันทึกค่าลงตาราง & บันทึกบน Web', 'Apply & Save on Web', '录入并网页保存')}</span>
           </button>
 
           <button
             onClick={() => setShowQuickEntry(false)}
             className="px-2 py-1 text-slate-500 hover:text-slate-800 cursor-pointer"
           >
-            ปิด
+            {t('ปิด', 'Close', '关闭')}
           </button>
         </div>
       )}

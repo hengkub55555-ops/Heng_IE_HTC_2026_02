@@ -1,16 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { MonthlyTrendItem, DayColumn, LineOECData } from '../types/oec';
 import { 
-  LineChart as LineChartIcon, 
-  BarChart3, 
-  Calendar, 
-  Layers, 
-  Zap, 
-  CheckCircle2, 
-  TrendingUp, 
-  Target, 
-  ArrowRightLeft 
+  LineChart as LineChartIcon
 } from 'lucide-react';
+import { useAppPreferences } from '../contexts/AppPreferencesContext';
 
 interface OecChartsProps {
   monthlyProduction: MonthlyTrendItem[];
@@ -25,8 +18,8 @@ export const OecCharts: React.FC<OecChartsProps> = ({
   monthlyUph,
   days,
   lines,
-  selectedProdLine = 'All',
 }) => {
+  const { currentTheme, t } = useAppPreferences();
   // View mode: 'daily' (directly plots table days) or 'monthly' (plots monthly trend where current month is synced with table)
   const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('monthly');
   // Comparison mode: 'lines' (Line A vs Line B) or 'planAct' (Planning vs Actual)
@@ -155,14 +148,14 @@ export const OecCharts: React.FC<OecChartsProps> = ({
     // Determine series 1 and series 2 based on comparison mode
     let series1Name = lineA?.prodLine || 'Line A';
     let series2Name = lineB?.prodLine || 'Line B';
-    let color1 = '#009fe3'; // Light blue (Line A in screenshot)
-    let color2 = '#002060'; // Dark navy (Line B in screenshot)
+    let color1 = currentTheme.primaryHex;
+    let color2 = currentTheme.secondaryHex;
 
     if (comparisonMode === 'planAct') {
-      series1Name = 'ยอดผลิตจริง (Actual)';
-      series2Name = 'เป้าหมาย (Planning)';
-      color1 = '#0070c0'; // Blue for actual
-      color2 = '#f59e0b'; // Amber for plan
+      series1Name = t('ยอดผลิตจริง (Actual)', 'Actual Output', '实际产量 (Actual)');
+      series2Name = t('เป้าหมาย (Planning)', 'Planned Target', '计划目标 (Planning)');
+      color1 = currentTheme.primaryHex;
+      color2 = '#f59e0b';
     }
 
     // Extract values
@@ -436,11 +429,11 @@ export const OecCharts: React.FC<OecChartsProps> = ({
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
             <LineChartIcon className="w-4 h-4 text-[#0070c0]" />
-            <span>Production & Efficiency Trends</span>
+            <span>{t('Production & Efficiency Trends (แนวโน้มการผลิตและประสิทธิภาพ)', 'Production & Efficiency Trends', '生产与效率趋势分析 (Trends)')}</span>
           </span>
           <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-[11px] font-semibold px-2 py-0.5 rounded border border-emerald-200">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>เชื่อมโยงกับตารางบนเว็บแบบ Real-Time</span>
+            <span>{t('เชื่อมโยงกับตารางบนเว็บแบบ Real-Time', 'Live Synced with Web Table', '与网页表格实时联动')}</span>
           </div>
         </div>
 
@@ -450,7 +443,7 @@ export const OecCharts: React.FC<OecChartsProps> = ({
           <div className="flex items-center bg-white p-0.5 rounded border border-slate-200 shadow-2xs">
             <button
               onClick={() => setComparisonMode('lines')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                 comparisonMode === 'lines'
                   ? 'bg-blue-50 text-[#0070c0] font-bold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -460,13 +453,13 @@ export const OecCharts: React.FC<OecChartsProps> = ({
             </button>
             <button
               onClick={() => setComparisonMode('planAct')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                 comparisonMode === 'planAct'
                   ? 'bg-blue-50 text-[#0070c0] font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Plan vs Actual
+              {t('Plan vs Actual (แผน vs จริง)', 'Plan vs Actual', '计划 vs 实际')}
             </button>
           </div>
 
@@ -474,25 +467,23 @@ export const OecCharts: React.FC<OecChartsProps> = ({
           <div className="flex items-center bg-white p-0.5 rounded border border-slate-200 shadow-2xs">
             <button
               onClick={() => setViewMode('monthly')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                 viewMode === 'monthly'
                   ? 'bg-[#0070c0] text-white font-bold shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="แสดงกราฟรายเดือนสะสม 2026-01 ถึง 2026-09 โดยเดือนล่าสุดซิงค์จากตารางด้านล่าง"
             >
-              รายเดือน (Monthly YTD)
+              {t('รายเดือน (Monthly YTD)', 'Monthly YTD', '月度趋势 (Monthly)')}
             </button>
             <button
               onClick={() => setViewMode('daily')}
-              className={`px-2.5 py-1 rounded font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded font-medium transition-colors cursor-pointer ${
                 viewMode === 'daily'
                   ? 'bg-[#0070c0] text-white font-bold shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="แสดงกราฟรายวันเชื่อมโยงตามคอลัมน์ 1 ถึง 25 ในตารางด้านล่างโดยตรง"
             >
-              รายวัน (ตามตาราง Daily 1-25)
+              {t('รายวัน (ตามตาราง Daily)', 'Daily (1-25)', '每日趋势 (Daily)')}
             </button>
           </div>
         </div>
@@ -500,19 +491,29 @@ export const OecCharts: React.FC<OecChartsProps> = ({
 
       {/* Two Side-by-Side Charts matching screenshot */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {renderLineChart('Production', 'prod', 'ชิ้น')}
-        {renderLineChart('UPH', 'uph', 'UPH')}
+        {renderLineChart(t('Production (ยอดการผลิต)', 'Production Output', '产量趋势 (Production)'), 'prod', t('ชิ้น', 'pcs', '台'))}
+        {renderLineChart(t('UPH (ประสิทธิภาพต่อชั่วโมง)', 'UPH Efficiency', '每小时产出效率 (UPH)'), 'uph', 'UPH')}
       </div>
 
       {/* Helpful Hint */}
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 px-1">
         <span>
           💡 {viewMode === 'daily' 
-            ? 'กราฟกำลังแสดงข้อมูลรายวันตามคอลัมน์ในตารางด้านล่าง: แก้ไขตัวเลข Act หรือ Work Time เส้นกราฟจะขยับทันที' 
-            : 'กราฟรายเดือนสะสม (2026-01 ถึง 2026-09): เดือนล่าสุดจะอัปเดตยอดรวมและ UPH ตามตารางด้านล่างโดยอัตโนมัติ'}
+            ? t(
+                'กราฟกำลังแสดงข้อมูลรายวันตามคอลัมน์ในตารางด้านล่าง: แก้ไขตัวเลข Act หรือ Work Time เส้นกราฟจะขยับทันที',
+                'Chart displays daily columns from the table below: editing Act or Work Time updates the chart immediately.',
+                '图表正在显示下方表格的每日数据：修改实际产量或工时将实时更新曲线。'
+              )
+            : t(
+                'กราฟรายเดือนสะสม (2026-01 ถึง 2026-09): เดือนล่าสุดจะอัปเดตยอดรวมและ UPH ตามตารางด้านล่างโดยอัตโนมัติ',
+                'Cumulative monthly trend (2026-01 to 2026-09): latest month automatically syncs totals & UPH from the table below.',
+                '月度累计趋势 (2026-01 至 2026-09)：最新月份自动同步下方表格的总产量与 UPH。'
+              )}
         </span>
-        <span className="font-semibold text-blue-600 hidden sm:inline">
-          {viewMode === 'daily' ? `แสดง ${days.length} วันทำการ` : `แสดง ${activeDataset.length} งวดเดือน`}
+        <span className="font-semibold text-[#0070c0] hidden sm:inline">
+          {viewMode === 'daily'
+            ? t(`แสดง ${days.length} วันทำการ`, `Showing ${days.length} working days`, `显示 ${days.length} 个工作日`)
+            : t(`แสดง ${activeDataset.length} งวดเดือน`, `Showing ${activeDataset.length} months`, `显示 ${activeDataset.length} 个月份`)}
         </span>
       </div>
     </div>

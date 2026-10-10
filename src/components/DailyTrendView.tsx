@@ -23,6 +23,7 @@ import {
   X
 } from 'lucide-react';
 import { getWeekdayName } from '../utils/dateHelper';
+import { useAppPreferences } from '../contexts/AppPreferencesContext';
 
 interface DailyTrendViewProps {
   days: DayColumn[];
@@ -54,6 +55,7 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
   hasUnsavedChanges = false,
   isSyncing = false,
 }) => {
+  const { t } = useAppPreferences();
   // Interactive Filter Controls
   const [dayFilterMode, setDayFilterMode] = useState<'active' | 'all'>('active');
   const [selectedLineFilter, setSelectedLineFilter] = useState<string>('all');
@@ -311,11 +313,23 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
             <span aria-hidden="true">·</span>
             <span>{periodLabel}</span>
             <span aria-hidden="true">·</span>
-            <span>เดินเครื่องผลิต {trendInsights.activeDaysCount} วัน จาก {days.length} วันในตาราง</span>
+            <span>
+              {t(
+                `เดินเครื่องผลิต ${trendInsights.activeDaysCount} วัน จาก ${days.length} วันในตาราง`,
+                `Active production ${trendInsights.activeDaysCount} of ${days.length} days`,
+                `实际生产 ${trendInsights.activeDaysCount} 天 (共 ${days.length} 天)`
+              )}
+            </span>
           </div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Activity className="w-5 h-5 text-[#0070c0]" />
-            <span>วิเคราะห์กราฟเทรนด์ข้อมูลรายวัน (Daily OEC Production & Efficiency Trends)</span>
+            <span>
+              {t(
+                'วิเคราะห์กราฟเทรนด์ข้อมูลรายวัน (Daily OEC Production & Efficiency Trends)',
+                'Daily OEC Production & Efficiency Trends Analysis',
+                '每日 OEC 生产与效率趋势分析图表 (Daily Trends)'
+              )}
+            </span>
           </h2>
         </div>
 
@@ -331,7 +345,7 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              ทุกสายการผลิต (Line A+B)
+              {t('ทุกสายการผลิต (Line A+B)', 'All Lines (Line A+B)', '全部产线 (Line A+B)')}
             </button>
             <button
               onClick={() => setSelectedLineFilter('lineA')}
@@ -341,7 +355,7 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              เฉพาะ {lineA?.prodLine || 'Line A'}
+              {t(`เฉพาะ ${lineA?.prodLine || 'Line A'}`, `Only ${lineA?.prodLine || 'Line A'}`, `仅 ${lineA?.prodLine || 'Line A'}`)}
             </button>
             {lineB && (
               <button
@@ -352,7 +366,7 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                เฉพาะ {lineB.prodLine}
+                {t(`เฉพาะ ${lineB.prodLine}`, `Only ${lineB.prodLine}`, `仅 ${lineB.prodLine}`)}
               </button>
             )}
           </div>
@@ -366,9 +380,12 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
                   ? 'bg-[#0070c0] text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="ซ่อนวันที่ไม่มีการเดินเครื่อง (ค่าเป็น 0) เพื่อให้เห็นเส้นเทรนด์ต่อเนื่องชัดเจน"
             >
-              เฉพาะวันที่มีผลิตจริง ({trendInsights.activeDaysCount} วัน)
+              {t(
+                `เฉพาะวันที่มีผลิตจริง (${trendInsights.activeDaysCount} วัน)`,
+                `Active Days (${trendInsights.activeDaysCount}d)`,
+                `仅生产日 (${trendInsights.activeDaysCount}天)`
+              )}
             </button>
             <button
               onClick={() => setDayFilterMode('all')}
@@ -377,9 +394,8 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
                   ? 'bg-[#0070c0] text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="แสดงทุกคอลัมน์วันตามปฏิทินในตาราง"
             >
-              ทุกวันในตาราง ({days.length} วัน)
+              {t(`ทุกวันในตาราง (${days.length} วัน)`, `All Days (${days.length}d)`, `全部日期 (${days.length}天)`)}
             </button>
           </div>
 
@@ -392,7 +408,9 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
                 : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {showMovingAvg ? '✓ เส้นเทรนด์ค่าเฉลี่ย 3 วัน (MA)' : '+ เปิดเส้นเทรนด์ MA'}
+            {showMovingAvg
+              ? t('✓ เส้นเทรนด์ค่าเฉลี่ย 3 วัน (MA)', '✓ 3-Day Moving Avg (MA)', '✓ 3日移动平均线 (MA)')
+              : t('+ เปิดเส้นเทรนด์ MA', '+ Enable MA Trend', '+ 开启移动平均线')}
           </button>
 
           {/* Data Labels Toggle */}
@@ -404,7 +422,9 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
                 : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {showDataLabels ? '✓ แสดงตัวเลขบนกราฟ' : 'ซ่อนตัวเลข'}
+            {showDataLabels
+              ? t('✓ แสดงตัวเลขบนกราฟ', '✓ Data Labels On', '✓ 显示图表数值')
+              : t('ซ่อนตัวเลข', 'Hide Labels', '隐藏数值')}
           </button>
 
           {/* Save on Web Button */}
@@ -419,7 +439,11 @@ export const DailyTrendView: React.FC<DailyTrendViewProps> = ({
               }`}
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{isSyncing ? 'กำลังบันทึก...' : 'บันทึกบน Web'}</span>
+              <span>
+                {isSyncing
+                  ? t('กำลังบันทึก...', 'Saving...', '保存中...')
+                  : t('บันทึกบน Web', 'Save on Web', '网页保存')}
+              </span>
             </button>
           )}
         </div>

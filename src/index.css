@@ -1,1 +1,157 @@
 @import "tailwindcss";
+
+:root,
+[data-theme="ocean"] {
+  --theme-primary: #0070c0;
+  --theme-primary-hover: #005ba3;
+  --theme-primary-dark: #002060;
+  --theme-secondary: #009fe3;
+  --theme-bg: #f8fafc;
+  --theme-surface: #ffffff;
+  --theme-surface-alt: #f1f5f9;
+  --theme-border: #e2e8f0;
+  --theme-text: #0f172a;
+  --theme-text-muted: #64748b;
+  --theme-tint: #eff6ff;
+}
+
+[data-theme="emerald"] {
+  --theme-primary: #059669;
+  --theme-primary-hover: #047857;
+  --theme-primary-dark: #064e3b;
+  --theme-secondary: #10b981;
+  --theme-bg: #f0fdf4;
+  --theme-surface: #ffffff;
+  --theme-surface-alt: #ecfdf5;
+  --theme-border: #d1fae5;
+  --theme-text: #064e3b;
+  --theme-text-muted: #047857;
+  --theme-tint: #d1fae5;
+}
+
+[data-theme="indigo"] {
+  --theme-primary: #4f46e5;
+  --theme-primary-hover: #4338ca;
+  --theme-primary-dark: #312e81;
+  --theme-secondary: #818cf8;
+  --theme-bg: #f5f3ff;
+  --theme-surface: #ffffff;
+  --theme-surface-alt: #ede9fe;
+  --theme-border: #ddd6fe;
+  --theme-text: #1e1b4b;
+  --theme-text-muted: #4338ca;
+  --theme-tint: #e0e7ff;
+}
+
+[data-theme="amber"] {
+  --theme-primary: #d97706;
+  --theme-primary-hover: #b45309;
+  --theme-primary-dark: #78350f;
+  --theme-secondary: #f59e0b;
+  --theme-bg: #fffbeb;
+  --theme-surface: #ffffff;
+  --theme-surface-alt: #fef3c7;
+  --theme-border: #fde68a;
+  --theme-text: #451a03;
+  --theme-text-muted: #92400e;
+  --theme-tint: #fef3c7;
+}
+
+[data-theme="midnight"] {
+  --theme-primary: #0284c7;
+  --theme-primary-hover: #0369a1;
+  --theme-primary-dark: #0c4a6e;
+  --theme-secondary: #38bdf8;
+  --theme-bg: #0b1120;
+  --theme-surface: #1e293b;
+  --theme-surface-alt: #0f172a;
+  --theme-border: #334155;
+  --theme-text: #f8fafc;
+  --theme-text-muted: #94a3b8;
+  --theme-tint: #1e293b;
+}
+
+/* Automatic theme mapping for hardcoded #0070c0 brand utilities across all components */
+[data-theme="emerald"] .bg-\[\#0070c0\],
+[data-theme="indigo"] .bg-\[\#0070c0\],
+[data-theme="amber"] .bg-\[\#0070c0\],
+[data-theme="midnight"] .bg-\[\#0070c0\] {
+  background-color: var(--theme-primary) !important;
+}
+
+[data-theme="emerald"] .hover\:bg-\[\#0064ad\]:hover,
+[data-theme="emerald"] .hover\:bg-\[\#005ba3\]:hover,
+[data-theme="indigo"] .hover\:bg-\[\#0064ad\]:hover,
+[data-theme="indigo"] .hover\:bg-\[\#005ba3\]:hover,
+[data-theme="amber"] .hover\:bg-\[\#0064ad\]:hover,
+[data-theme="amber"] .hover\:bg-\[\#005ba3\]:hover,
+[data-theme="midnight"] .hover\:bg-\[\#0064ad\]:hover,
+[data-theme="midnight"] .hover\:bg-\[\#005ba3\]:hover {
+  background-color: var(--theme-primary-hover) !important;
+}
+
+[data-theme="emerald"] .text-\[\#0070c0\],
+[data-theme="indigo"] .text-\[\#0070c0\],
+[data-theme="amber"] .text-\[\#0070c0\] {
+  color: var(--theme-primary) !important;
+}
+
+[data-theme="midnight"] .text-\[\#0070c0\] {
+  color: #38bdf8 !important;
+}
+
+[data-theme="emerald"] .border-\[\#0070c0\],
+[data-theme="indigo"] .border-\[\#0070c0\],
+[data-theme="amber"] .border-\[\#0070c0\],
+[data-theme="midnight"] .border-\[\#0070c0\] {
+  border-color: var(--theme-primary) !important;
+}
+
+[data-theme="emerald"] .bg-\[\#f8fafc\],
+[data-theme="indigo"] .bg-\[\#f8fafc\],
+[data-theme="amber"] .bg-\[\#f8fafc\],
+[data-theme="midnight"] .bg-\[\#f8fafc\] {
+  background-color: var(--theme-bg) !important;
+}
+
+/* Midnight Dark Mode comprehensive surface adaptation */
+[data-theme="midnight"] {
+  color-scheme: dark;
+}
+
+[data-theme="midnight"] body {
+  background-color: #0b1120;
+  color: #f1f5f9;
+}
+
+[data-theme="midnight"] header.bg-white,
+[data-theme="midnight"] .bg-white {
+  background-color: #1e293b !important;
+  color: #f1f5f9;
+}
+
+[data-theme="midnight"] .bg-slate-50,
+[data-theme="midnight"] .bg-slate-50\/80,
+[data-theme="midnight"] .bg-slate-50\/70,
+[data-theme="midnight"] .bg-slate-100 {
+  background-color: #0f172a !important;
+  color: #e2e8f0;
+}
+
+[data-theme="midnight"] .border-slate-200,
+[data-theme="midnight"] .border-slate-300,
+[data-theme="midnight"] .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+[data-theme="midnight"] .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #334155 !important;
+}
+
+[data-theme="midnight"] .text-slate-900,
+[data-theme="midnight"] .text-slate-800,
+[data-theme="midnight"] .text-slate-700 {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="midnight"] .text-slate-600,
+[data-theme="midnight"] .text-slate-500 {
+  color: #94a3b8 !important;
+}

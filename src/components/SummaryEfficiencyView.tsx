@@ -21,6 +21,7 @@ import {
   ArrowDownRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useAppPreferences } from '../contexts/AppPreferencesContext';
 
 interface SummaryEfficiencyViewProps {
   data: MonthlyEfficiencyRow[];
@@ -33,6 +34,7 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
   onUpdateData,
   plantName,
 }) => {
+  const { t } = useAppPreferences();
   const [activeChartTab, setActiveChartTab] = useState<'uph' | 'volume'>('uph');
   const [editingCell, setEditingCell] = useState<{
     index: number;
@@ -292,28 +294,36 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight mt-1">
-            สรุปประสิทธิภาพการผลิต Line A & Line B (AVG & Actual YTD)
+            {t(
+              'สรุปประสิทธิภาพการผลิต Line A & Line B (AVG & Actual YTD)',
+              'Summary Production Efficiency Line A & Line B (AVG & Actual YTD)',
+              '产线 A 与 产线 B 生产效率汇总 (月均与年度累计 YTD)'
+            )}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            รวบรวมข้อมูลรายเดือน ค่าเฉลี่ยประสิทธิภาพ UPH, ยอดผลิตจริงสะสม (Actual YTD), เปรียบเทียบแผนงาน และดัชนีประสิทธิภาพของแต่ละสายการผลิต
+            {t(
+              'รวบรวมข้อมูลรายเดือน ค่าเฉลี่ยประสิทธิภาพ UPH, ยอดผลิตจริงสะสม (Actual YTD), เปรียบเทียบแผนงาน และดัชนีประสิทธิภาพของแต่ละสายการผลิต',
+              'Monthly summary of average UPH efficiency, cumulative Actual YTD output, plan comparison, and performance indices per line.',
+              '汇总各月平均 UPH 效率、年度累计实际产量 (Actual YTD)、计划对比及各产线效率指标。'
+            )}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowAddMonthModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded border border-slate-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded border border-slate-300 transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 text-blue-600" />
-            <span>เพิ่มงวดเดือน</span>
+            <span>{t('เพิ่มงวดเดือน', 'Add Month', '新增月份')}</span>
           </button>
 
           <button
             onClick={handleExportExcel}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded shadow-xs transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded shadow-xs transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>ส่งออกตารางสรุป YTD (Excel)</span>
+            <span>{t('ส่งออกตารางสรุป YTD (Excel)', 'Export YTD Summary (Excel)', '导出 YTD 汇总表 (Excel)')}</span>
           </button>
         </div>
       </div>
