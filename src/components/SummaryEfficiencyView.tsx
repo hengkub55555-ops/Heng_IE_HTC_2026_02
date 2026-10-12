@@ -18,7 +18,9 @@ import {
   AlertCircle,
   HelpCircle,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Save,
+  Trash2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAppPreferences } from '../contexts/AppPreferencesContext';
@@ -27,12 +29,18 @@ interface SummaryEfficiencyViewProps {
   data: MonthlyEfficiencyRow[];
   onUpdateData: (newData: MonthlyEfficiencyRow[]) => void;
   plantName: string;
+  onSaveOnWeb?: () => void;
+  hasUnsavedChanges?: boolean;
+  isSyncing?: boolean;
 }
 
 export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
   data,
   onUpdateData,
   plantName,
+  onSaveOnWeb,
+  hasUnsavedChanges = false,
+  isSyncing = false,
 }) => {
   const { t } = useAppPreferences();
   const [activeChartTab, setActiveChartTab] = useState<'uph' | 'volume'>('uph');
@@ -124,7 +132,7 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
     const { index, field, val } = editingCell;
 
     const updated = [...data];
-    const currentRow = { ...updated[index] };
+    const currentRow = { ...updated[index], manualOverride: true };
 
     if (field === 'notes' || field === 'month' || field === 'monthNameTh') {
       (currentRow as any)[field] = val;
@@ -148,6 +156,12 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
     updated[index] = currentRow;
     onUpdateData(updated);
     setEditingCell(null);
+  };
+
+  const handleDeleteMonth = (idx: number) => {
+    if (data.length <= 1) return;
+    const updated = data.filter((_, i) => i !== idx);
+    onUpdateData(updated);
   };
 
   const handleAddMonth = () => {
@@ -320,11 +334,30 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
 
           <button
             onClick={handleExportExcel}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded border border-slate-300 transition-colors cursor-pointer"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
             <span>{t('ส่งออกตารางสรุป YTD (Excel)', 'Export YTD Summary (Excel)', '导出 YTD 汇总表 (Excel)')}</span>
           </button>
+
+          {onSaveOnWeb && (
+            <button
+              onClick={onSaveOnWeb}
+              disabled={isSyncing}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-bold shadow-xs transition-all cursor-pointer ${
+                hasUnsavedChanges
+                  ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-300'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>
+                {isSyncing
+                  ? t('กำลังบันทึก...', 'Saving...', '保存中...')
+                  : t('บันทึกอัพเดทบน Web', 'Save & Update on Web', '保存更新至网页')}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -714,10 +747,26 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
 
                 return (
                   <tr key={row.month} className="hover:bg-blue-50/40 transition-colors divide-x divide-slate-200">
-                    {/* Month Cell */}
-                    <td className="py-2 px-3 font-bold text-slate-900 bg-slate-50 text-center whitespace-nowrap">
+                    {/* Month Cell (Click to Edit Month or Thai Name) */}
+                    <td
+                      onClick={() => handleStartEdit(idx, 'monthNameTh', row.monthNameTh || row.month)}
+                      className="py-2 px-3 font-bold text-slate-900 bg-slate-50 text-center whitespace-nowrap cursor-pointer hover:bg-blue-50"
+                      title={t('คลิกเพื่อแก้ไขชื่องวดเดือน', 'Click to edit month label', '点击修改月份名称')}
+                    >
                       <div>{row.month}</div>
-                      <div className="text-[10px] text-slate-500 font-normal">{row.monthNameTh}</div>
+                      {editingCell?.index === idx && editingCell.field === 'monthNameTh' ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editingCell.val}
+                          onChange={e => setEditingCell({ ...editingCell, val: e.target.value })}
+                          onBlur={handleSaveEdit}
+                          onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                          className="w-24 text-center bg-white border border-blue-500 outline-none px-1 text-[10px]"
+                        />
+                      ) : (
+                        <div className="text-[10px] text-slate-500 font-normal">{row.monthNameTh}</div>
+                      )}
                     </td>
 
                     {/* LINE A: Plan */}
@@ -788,13 +837,43 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
                     </td>
 
                     {/* LINE A: UPH */}
-                    <td className="py-1.5 px-2 text-center font-black bg-sky-50/60 text-[#0284c7]">
-                      {row.lineAUph}
+                    <td
+                      onClick={() => handleStartEdit(idx, 'lineAUph', row.lineAUph)}
+                      className="py-1.5 px-2 text-center font-black bg-sky-50/60 text-[#0284c7] cursor-pointer hover:bg-sky-100"
+                    >
+                      {editingCell?.index === idx && editingCell.field === 'lineAUph' ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          value={editingCell.val}
+                          onChange={e => setEditingCell({ ...editingCell, val: e.target.value })}
+                          onBlur={handleSaveEdit}
+                          onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                          className="w-full text-center bg-white border border-blue-500 outline-none px-1"
+                        />
+                      ) : (
+                        row.lineAUph
+                      )}
                     </td>
 
                     {/* LINE A: Target */}
-                    <td className="py-1.5 px-2 text-center text-slate-500 font-medium">
-                      {row.lineATargetUph}
+                    <td
+                      onClick={() => handleStartEdit(idx, 'lineATargetUph', row.lineATargetUph)}
+                      className="py-1.5 px-2 text-center text-slate-500 font-medium cursor-pointer hover:bg-sky-50"
+                    >
+                      {editingCell?.index === idx && editingCell.field === 'lineATargetUph' ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          value={editingCell.val}
+                          onChange={e => setEditingCell({ ...editingCell, val: e.target.value })}
+                          onBlur={handleSaveEdit}
+                          onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                          className="w-full text-center bg-white border border-blue-500 outline-none px-1"
+                        />
+                      ) : (
+                        row.lineATargetUph
+                      )}
                     </td>
 
                     {/* LINE B: Plan */}
@@ -865,13 +944,43 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
                     </td>
 
                     {/* LINE B: UPH */}
-                    <td className="py-1.5 px-2 text-center font-black bg-blue-50/70 text-[#1e3a8a]">
-                      {row.lineBUph}
+                    <td
+                      onClick={() => handleStartEdit(idx, 'lineBUph', row.lineBUph)}
+                      className="py-1.5 px-2 text-center font-black bg-blue-50/70 text-[#1e3a8a] cursor-pointer hover:bg-blue-100"
+                    >
+                      {editingCell?.index === idx && editingCell.field === 'lineBUph' ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          value={editingCell.val}
+                          onChange={e => setEditingCell({ ...editingCell, val: e.target.value })}
+                          onBlur={handleSaveEdit}
+                          onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                          className="w-full text-center bg-white border border-blue-500 outline-none px-1"
+                        />
+                      ) : (
+                        row.lineBUph
+                      )}
                     </td>
 
                     {/* LINE B: Target */}
-                    <td className="py-1.5 px-2 text-center text-slate-500 font-medium">
-                      {row.lineBTargetUph}
+                    <td
+                      onClick={() => handleStartEdit(idx, 'lineBTargetUph', row.lineBTargetUph)}
+                      className="py-1.5 px-2 text-center text-slate-500 font-medium cursor-pointer hover:bg-blue-50"
+                    >
+                      {editingCell?.index === idx && editingCell.field === 'lineBTargetUph' ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          value={editingCell.val}
+                          onChange={e => setEditingCell({ ...editingCell, val: e.target.value })}
+                          onBlur={handleSaveEdit}
+                          onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                          className="w-full text-center bg-white border border-blue-500 outline-none px-1"
+                        />
+                      ) : (
+                        row.lineBTargetUph
+                      )}
                     </td>
 
                     {/* TOTAL PLANT: Plan */}
@@ -901,25 +1010,40 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
                       {plantUph}
                     </td>
 
-                    {/* Remark */}
+                    {/* Remark & Delete */}
                     <td
                       onClick={() => handleStartEdit(idx, 'notes', row.notes)}
-                      className="py-1.5 px-3 text-slate-600 text-[11px] cursor-pointer hover:bg-slate-50 truncate max-w-[200px]"
+                      className="py-1.5 px-3 text-slate-600 text-[11px] cursor-pointer hover:bg-slate-50 max-w-[220px]"
                       title={row.notes}
                     >
-                      {editingCell?.index === idx && editingCell.field === 'notes' ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          value={editingCell.val}
-                          onChange={e => setEditingCell({ ...editingCell, val: e.target.value })}
-                          onBlur={handleSaveEdit}
-                          onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
-                          className="w-full bg-white border border-blue-500 outline-none px-1"
-                        />
-                      ) : (
-                        row.notes || '-'
-                      )}
+                      <div className="flex items-center justify-between gap-1.5">
+                        {editingCell?.index === idx && editingCell.field === 'notes' ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editingCell.val}
+                            onChange={e => setEditingCell({ ...editingCell, val: e.target.value })}
+                            onBlur={handleSaveEdit}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                            className="w-full bg-white border border-blue-500 outline-none px-1"
+                          />
+                        ) : (
+                          <span className="truncate">{row.notes || '-'}</span>
+                        )}
+                        {data.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleDeleteMonth(idx);
+                            }}
+                            className="text-slate-300 hover:text-rose-600 p-0.5 shrink-0"
+                            title={t('ลบงวดเดือนนี้', 'Delete this month', '删除此月份')}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

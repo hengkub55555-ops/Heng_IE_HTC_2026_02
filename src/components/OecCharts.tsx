@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { MonthlyTrendItem, DayColumn, LineOECData } from '../types/oec';
+import { MonthlyTrendItem, DayColumn, LineOECData, MonthlyEfficiencyRow } from '../types/oec';
 import { 
-  LineChart as LineChartIcon
+  LineChart as LineChartIcon,
+  Edit3,
+  Save,
+  Check
 } from 'lucide-react';
 import { useAppPreferences } from '../contexts/AppPreferencesContext';
 
@@ -11,6 +14,9 @@ interface OecChartsProps {
   days: DayColumn[];
   lines: LineOECData[];
   selectedProdLine?: string;
+  monthlyEfficiency?: MonthlyEfficiencyRow[];
+  onUpdateMonthlyEfficiency?: (newData: MonthlyEfficiencyRow[]) => void;
+  onSaveOnWeb?: () => void;
 }
 
 export const OecCharts: React.FC<OecChartsProps> = ({
@@ -18,6 +24,9 @@ export const OecCharts: React.FC<OecChartsProps> = ({
   monthlyUph,
   days,
   lines,
+  monthlyEfficiency = [],
+  onUpdateMonthlyEfficiency,
+  onSaveOnWeb,
 }) => {
   const { currentTheme, t } = useAppPreferences();
   // View mode: 'daily' (directly plots table days) or 'monthly' (plots monthly trend where current month is synced with table)
@@ -25,6 +34,7 @@ export const OecCharts: React.FC<OecChartsProps> = ({
   // Comparison mode: 'lines' (Line A vs Line B) or 'planAct' (Planning vs Actual)
   const [comparisonMode, setComparisonMode] = useState<'lines' | 'planAct'>('lines');
   const [hoveredIndex, setHoveredIndex] = useState<{ chart: 'prod' | 'uph'; idx: number } | null>(null);
+  const [showEditChartTable, setShowEditChartTable] = useState<boolean>(false);
 
   // Extract Line A and Line B dynamically
   const lineA = useMemo(() => {
@@ -486,8 +496,153 @@ export const OecCharts: React.FC<OecChartsProps> = ({
               {t('รายวัน (ตามตาราง Daily)', 'Daily (1-25)', '每日趋势 (Daily)')}
             </button>
           </div>
+
+          {onUpdateMonthlyEfficiency && monthlyEfficiency.length > 0 && (
+            <button
+              onClick={() => setShowEditChartTable(!showEditChartTable)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded font-bold border transition-colors cursor-pointer ${
+                showEditChartTable
+                  ? 'bg-amber-500 text-white border-amber-600'
+                  : 'bg-white hover:bg-blue-50 text-[#0070c0] border-blue-200'
+              }`}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>
+                {showEditChartTable
+                  ? t('ซ่อนตารางแก้ข้อมูลกราฟ', 'Hide Chart Data Editor', '隐藏图表数据编辑')
+                  : t('แก้ไขข้อมูลกราฟรายเดือน', 'Edit Monthly Chart Data', '修改月度图表数据')}
+              </span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Inline Monthly Chart Data Editor */}
+      {showEditChartTable && onUpdateMonthlyEfficiency && monthlyEfficiency.length > 0 && (
+        <div className="mb-3 bg-white rounded-md border border-blue-300 shadow-sm overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-blue-50/80 px-4 py-2 border-b border-blue-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="font-bold text-slate-800 flex items-center gap-1.5">
+              <Edit3 className="w-3.5 h-3.5 text-[#0070c0]" />
+              <span>
+                {t(
+                  'แก้ไขตัวเลขยอดผลิตรายเดือน (Production) และประสิทธิภาพ (UPH) ของ Line A & Line B บนกราฟโดยตรง:',
+                  'Directly edit Monthly Production & UPH values for Line A & Line B:',
+                  '直接修改图表中产线 A 与产线 B 的月度产量 (Production) 与效率 (UPH)：'
+                )}
+              </span>
+            </span>
+            {onSaveOnWeb && (
+              <button
+                onClick={onSaveOnWeb}
+                className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded cursor-pointer"
+              >
+                <Save className="w-3 h-3" />
+                <span>{t('บันทึกอัพเดทบน Web', 'Save on Web', '保存到网页')}</span>
+              </button>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-center border-collapse">
+              <thead>
+                <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 divide-x divide-slate-200">
+                  <th className="py-1.5 px-2.5 text-left min-w-[130px]">{t('รายการ / เดือน', 'Metric / Month', '指标 / 月份')}</th>
+                  {monthlyEfficiency.map(m => (
+                    <th key={m.month} className="py-1.5 px-2 min-w-[82px] font-mono">
+                      {m.month}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 tabular-nums">
+                {/* Line A Production */}
+                <tr className="divide-x divide-slate-200 hover:bg-sky-50/40">
+                  <td className="py-1.5 px-2.5 text-left font-bold text-[#0070c0] bg-slate-50">
+                    Line A Act (ชิ้น)
+                  </td>
+                  {monthlyEfficiency.map((m, idx) => (
+                    <td key={m.month} className="p-1">
+                      <input
+                        type="number"
+                        value={m.lineAAct}
+                        onChange={e => {
+                          const val = Number(e.target.value) || 0;
+                          const next = [...monthlyEfficiency];
+                          next[idx] = { ...next[idx], lineAAct: val, manualOverride: true };
+                          onUpdateMonthlyEfficiency(next);
+                        }}
+                        className="w-full text-right bg-white border border-slate-200 focus:border-[#0070c0] rounded px-1.5 py-0.5 font-mono font-bold text-slate-800 outline-none"
+                      />
+                    </td>
+                  ))}
+                </tr>
+                {/* Line B Production */}
+                <tr className="divide-x divide-slate-200 hover:bg-blue-50/40">
+                  <td className="py-1.5 px-2.5 text-left font-bold text-slate-800 bg-slate-50">
+                    Line B Act (ชิ้น)
+                  </td>
+                  {monthlyEfficiency.map((m, idx) => (
+                    <td key={m.month} className="p-1">
+                      <input
+                        type="number"
+                        value={m.lineBAct}
+                        onChange={e => {
+                          const val = Number(e.target.value) || 0;
+                          const next = [...monthlyEfficiency];
+                          next[idx] = { ...next[idx], lineBAct: val, manualOverride: true };
+                          onUpdateMonthlyEfficiency(next);
+                        }}
+                        className="w-full text-right bg-white border border-slate-200 focus:border-[#0070c0] rounded px-1.5 py-0.5 font-mono font-bold text-slate-800 outline-none"
+                      />
+                    </td>
+                  ))}
+                </tr>
+                {/* Line A UPH */}
+                <tr className="divide-x divide-slate-200 hover:bg-sky-50/40">
+                  <td className="py-1.5 px-2.5 text-left font-bold text-[#0070c0] bg-slate-50">
+                    Line A UPH
+                  </td>
+                  {monthlyEfficiency.map((m, idx) => (
+                    <td key={m.month} className="p-1">
+                      <input
+                        type="number"
+                        value={m.lineAUph}
+                        onChange={e => {
+                          const val = Number(e.target.value) || 0;
+                          const next = [...monthlyEfficiency];
+                          next[idx] = { ...next[idx], lineAUph: val, manualOverride: true };
+                          onUpdateMonthlyEfficiency(next);
+                        }}
+                        className="w-full text-center bg-sky-50/50 border border-slate-200 focus:border-[#0070c0] rounded px-1.5 py-0.5 font-mono font-black text-[#0070c0] outline-none"
+                      />
+                    </td>
+                  ))}
+                </tr>
+                {/* Line B UPH */}
+                <tr className="divide-x divide-slate-200 hover:bg-blue-50/40">
+                  <td className="py-1.5 px-2.5 text-left font-bold text-slate-800 bg-slate-50">
+                    Line B UPH
+                  </td>
+                  {monthlyEfficiency.map((m, idx) => (
+                    <td key={m.month} className="p-1">
+                      <input
+                        type="number"
+                        value={m.lineBUph}
+                        onChange={e => {
+                          const val = Number(e.target.value) || 0;
+                          const next = [...monthlyEfficiency];
+                          next[idx] = { ...next[idx], lineBUph: val, manualOverride: true };
+                          onUpdateMonthlyEfficiency(next);
+                        }}
+                        className="w-full text-center bg-blue-50/50 border border-slate-200 focus:border-[#0070c0] rounded px-1.5 py-0.5 font-mono font-black text-slate-800 outline-none"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Two Side-by-Side Charts matching screenshot */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

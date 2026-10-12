@@ -16,7 +16,9 @@ import {
   MonthlyEfficiencyRow, 
   ActionItem, 
   PeriodStorageState, 
-  WebSavedSnapshot 
+  WebSavedSnapshot,
+  EditableCustomSheet,
+  UpphSheetData
 } from '../types/oec';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -85,6 +87,8 @@ export interface CloudDashboardPayload {
   actionItems: ActionItem[];
   periodData?: PeriodStorageState;
   webSnapshots?: WebSavedSnapshot[];
+  extraSheets?: EditableCustomSheet[];
+  upphSheet?: UpphSheetData;
   updatedAt?: string;
   updatedBy?: string;
 }

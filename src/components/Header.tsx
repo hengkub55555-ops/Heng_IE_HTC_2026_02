@@ -27,7 +27,7 @@ import {
   Languages,
   Palette
 } from 'lucide-react';
-import { OECFilterState, ActiveSheetTab } from '../types/oec';
+import { OECFilterState, ActiveSheetTab, EditableCustomSheet } from '../types/oec';
 import { THAI_MONTHS } from '../utils/dateHelper';
 import { useAppPreferences, APP_THEMES, AppLanguage } from '../contexts/AppPreferencesContext';
 
@@ -58,6 +58,7 @@ interface HeaderProps {
   onOpenWebSaveModal?: () => void;
   hasUnsavedChanges?: boolean;
   savedPeriodsCount?: number;
+  extraSheets?: EditableCustomSheet[];
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -87,6 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenWebSaveModal,
   hasUnsavedChanges = false,
   savedPeriodsCount = 1,
+  extraSheets = [],
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
@@ -471,6 +473,24 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
+              onClick={() => onTabChange('upph-oec')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'upph-oec'
+                  ? 'border-[#0070c0] text-[#0070c0] bg-blue-50/70 shadow-xs'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-[#0070c0]" />
+              <span>
+                {t(
+                  'Sheet UPPH: UPPH OEC (人效日清 - ต้นฉบับแก้ไขได้)',
+                  'Sheet UPPH: UPPH OEC (Original Editable)',
+                  'Sheet UPPH: UPPH OEC (人效日清原版可编辑)'
+                )}
+              </span>
+            </button>
+
+            <button
               onClick={() => onTabChange('daily-trend')}
               className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'daily-trend'
@@ -505,6 +525,27 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </span>
             </button>
+
+            {extraSheets.map(s => {
+              const tabId = s.id as ActiveSheetTab;
+              const isSelected = activeTab === tabId;
+              const tabLabel =
+                language === 'en' ? s.tabNameEn : language === 'zh' ? s.tabNameZh : s.tabNameTh;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => onTabChange(tabId)}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                    isSelected
+                      ? 'border-[#0070c0] text-[#0070c0] bg-blue-50/70 shadow-xs'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-[#0070c0]" />
+                  <span>{tabLabel}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

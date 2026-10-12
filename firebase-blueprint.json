@@ -18,6 +18,8 @@
         "actionItems": { "type": "array" },
         "periodData": { "type": "object" },
         "webSnapshots": { "type": "array" },
+        "extraSheets": { "type": "array" },
+        "upphSheet": { "type": "object" },
         "updatedAt": { "type": "string" }
       },
       "required": ["id", "lines", "days"]

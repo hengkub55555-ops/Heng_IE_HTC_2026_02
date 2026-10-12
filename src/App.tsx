@@ -23,6 +23,8 @@ import {
   INITIAL_LINE_DATA,
   INITIAL_ACTION_ITEMS,
   INITIAL_MONTHLY_EFFICIENCY,
+  INITIAL_EXTRA_SHEETS,
+  INITIAL_UPPH_SHEET_DATA,
 } from './data/initialData';
 import { 
   LineOECData, 
@@ -33,9 +35,13 @@ import {
   MonthlyEfficiencyRow,
   ActiveSheetTab,
   PeriodStorageState,
-  WebSavedSnapshot
+  WebSavedSnapshot,
+  EditableCustomSheet,
+  UpphSheetData
 } from './types/oec';
 import { SummaryEfficiencyView } from './components/SummaryEfficiencyView';
+import { EditableWebSheetView } from './components/EditableWebSheetView';
+import { UpphOecView } from './components/UpphOecView';
 import { downloadOECTemplate, exportToCSV } from './utils/excelHelper';
 import { 
   testFirestoreConnection, 
@@ -56,6 +62,8 @@ export default function App() {
   const STORAGE_KEY_TAB = 'oec_active_tab_v1';
   const STORAGE_KEY_PERIODS = 'oec_period_data_v1';
   const STORAGE_KEY_SNAPSHOTS = 'oec_web_snapshots_v1';
+  const STORAGE_KEY_EXTRA_SHEETS = 'oec_extra_sheets_v1';
+  const STORAGE_KEY_UPPH_SHEET = 'oec_upph_sheet_v1';
 
   // Sheet Tab State
   const [activeTab, setActiveTab] = useState<ActiveSheetTab>(() => {
@@ -120,6 +128,24 @@ export default function App() {
     }
   });
 
+  const [extraSheets, setExtraSheets] = useState<EditableCustomSheet[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_EXTRA_SHEETS);
+      return saved ? JSON.parse(saved) : INITIAL_EXTRA_SHEETS;
+    } catch {
+      return INITIAL_EXTRA_SHEETS;
+    }
+  });
+
+  const [upphSheet, setUpphSheet] = useState<UpphSheetData>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_UPPH_SHEET);
+      return saved ? JSON.parse(saved) : INITIAL_UPPH_SHEET_DATA;
+    } catch {
+      return INITIAL_UPPH_SHEET_DATA;
+    }
+  });
+
   const [filters, setFilters] = useState<OECFilterState>({
     plant: 'ทั้งหมด',
     year: 2026,
@@ -152,8 +178,8 @@ export default function App() {
     }
 
     return monthlyEfficiency.map(item => {
-      // Sync the active month with the live sum from the Daily Table
-      if (item.month === activePeriodKey) {
+      // Sync the active month with the live sum from the Daily Table unless manually overridden
+      if (item.month === activePeriodKey && !item.manualOverride) {
         return {
           month: item.month,
           lineA: liveLineAAct > 0 ? liveLineAAct : item.lineAAct,
@@ -200,8 +226,8 @@ export default function App() {
     const liveLineBUph = liveLineBWorkHours > 0 ? Math.round(liveLineBAct / liveLineBWorkHours) : 0;
 
     return monthlyEfficiency.map(item => {
-      // Sync the active month with the live UPH from the Daily Table
-      if (item.month === activePeriodKey) {
+      // Sync the active month with the live UPH from the Daily Table unless manually overridden
+      if (item.month === activePeriodKey && !item.manualOverride) {
         return {
           month: item.month,
           lineA: liveLineAUph > 0 ? liveLineAUph : item.lineAUph,
@@ -254,7 +280,7 @@ export default function App() {
     const liveLineBUph = liveLineBWorkHours > 0 ? Math.round(liveLineBAct / liveLineBWorkHours) : 0;
 
     return monthlyEfficiency.map(item => {
-      if (item.month === activePeriodKey) {
+      if (item.month === activePeriodKey && !item.manualOverride) {
         const lineAPlan = liveLineAPlan > 0 ? liveLineAPlan : item.lineAPlan;
         const lineAAct = liveLineAAct > 0 ? liveLineAAct : item.lineAAct;
         const lineAUph = liveLineAUph > 0 ? liveLineAUph : item.lineAUph;
@@ -319,6 +345,8 @@ export default function App() {
         actionItems: override?.actionItems ?? actionItems,
         periodData: override?.periodData ?? periodData,
         webSnapshots: override?.webSnapshots ?? webSnapshots,
+        extraSheets: override?.extraSheets ?? extraSheets,
+        upphSheet: override?.upphSheet ?? upphSheet,
       });
       setLastSyncTime(new Date());
       setIsOnline(true);
@@ -347,6 +375,8 @@ export default function App() {
           actionItems: currentActions,
           periodData: currentPeriods ?? periodData,
           webSnapshots,
+          extraSheets,
+          upphSheet,
         });
         setLastSyncTime(new Date());
         setIsOnline(true);
@@ -372,6 +402,8 @@ export default function App() {
       actionItems,
       periodData,
       webSnapshots,
+      extraSheets,
+      upphSheet,
     }).then(cloudData => {
       if (cloudData) {
         if (cloudData.lines && cloudData.lines.length > 0) setLines(cloudData.lines);
@@ -380,6 +412,8 @@ export default function App() {
         if (cloudData.actionItems && cloudData.actionItems.length > 0) setActionItems(cloudData.actionItems);
         if (cloudData.periodData) setPeriodData(cloudData.periodData);
         if (cloudData.webSnapshots) setWebSnapshots(cloudData.webSnapshots);
+        if (cloudData.extraSheets && cloudData.extraSheets.length > 0) setExtraSheets(cloudData.extraSheets);
+        if (cloudData.upphSheet && cloudData.upphSheet.lines) setUpphSheet(cloudData.upphSheet);
       }
     });
 
@@ -404,6 +438,12 @@ export default function App() {
         }
         if (cloudData.webSnapshots) {
           setWebSnapshots(cloudData.webSnapshots);
+        }
+        if (cloudData.extraSheets && cloudData.extraSheets.length > 0) {
+          setExtraSheets(cloudData.extraSheets);
+        }
+        if (cloudData.upphSheet && cloudData.upphSheet.lines) {
+          setUpphSheet(cloudData.upphSheet);
         }
       },
       (err) => {
@@ -471,6 +511,22 @@ export default function App() {
       console.error('Error saving webSnapshots:', e);
     }
   }, [webSnapshots]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_EXTRA_SHEETS, JSON.stringify(extraSheets));
+    } catch (e) {
+      console.error('Error saving extraSheets:', e);
+    }
+  }, [extraSheets]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_UPPH_SHEET, JSON.stringify(upphSheet));
+    } catch (e) {
+      console.error('Error saving upphSheet:', e);
+    }
+  }, [upphSheet]);
 
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ message, type });
@@ -633,6 +689,8 @@ export default function App() {
       days,
       monthlyEfficiency: nextMonthlyEfficiency,
       actionItems,
+      extraSheets,
+      upphSheet,
     };
 
     const nextSnapshots = [newSnapshot, ...webSnapshots].slice(0, 15);
@@ -647,6 +705,8 @@ export default function App() {
       actionItems,
       periodData: nextPeriodData,
       webSnapshots: nextSnapshots,
+      extraSheets,
+      upphSheet,
     });
 
     showToast(`บันทึกข้อมูลบน Web สำเร็จ! (${formatPeriodLabel(filters.year, activePeriodKey)})`);
@@ -831,16 +891,22 @@ export default function App() {
       setDays(INITIAL_DAYS);
       setMonthlyEfficiency(INITIAL_MONTHLY_EFFICIENCY);
       setActionItems(INITIAL_ACTION_ITEMS);
+      setExtraSheets(INITIAL_EXTRA_SHEETS);
+      setUpphSheet(INITIAL_UPPH_SHEET_DATA);
       setHasUnsavedChanges(false);
       localStorage.removeItem(STORAGE_KEY_LINES);
       localStorage.removeItem(STORAGE_KEY_DAYS);
       localStorage.removeItem(STORAGE_KEY_ACTIONS);
       localStorage.removeItem(STORAGE_KEY_EFFICIENCY);
+      localStorage.removeItem(STORAGE_KEY_EXTRA_SHEETS);
+      localStorage.removeItem(STORAGE_KEY_UPPH_SHEET);
       syncToCloud({
         lines: INITIAL_LINE_DATA,
         days: INITIAL_DAYS,
         monthlyEfficiency: INITIAL_MONTHLY_EFFICIENCY,
         actionItems: INITIAL_ACTION_ITEMS,
+        extraSheets: INITIAL_EXTRA_SHEETS,
+        upphSheet: INITIAL_UPPH_SHEET_DATA,
       });
       showToast('รีเซ็ตข้อมูลกลับสู่ค่ามาตรฐานสำเร็จ');
     }
@@ -925,6 +991,19 @@ export default function App() {
     syncToCloud({ monthlyEfficiency: newData });
   };
 
+  const handleUpdateExtraSheet = (updatedSheet: EditableCustomSheet) => {
+    const nextExtra = extraSheets.map(s => (s.id === updatedSheet.id ? updatedSheet : s));
+    setExtraSheets(nextExtra);
+    setHasUnsavedChanges(true);
+    syncToCloud({ extraSheets: nextExtra });
+  };
+
+  const handleUpdateUpphSheet = (newUpphData: UpphSheetData) => {
+    setUpphSheet(newUpphData);
+    setHasUnsavedChanges(true);
+    syncToCloud({ upphSheet: newUpphData });
+  };
+
   const handleUpdateActionItems = (newActions: ActionItem[]) => {
     setActionItems(newActions);
     syncToCloud({ actionItems: newActions });
@@ -980,6 +1059,7 @@ export default function App() {
         onOpenWebSaveModal={() => setShowWebSaveModal(true)}
         hasUnsavedChanges={hasUnsavedChanges}
         savedPeriodsCount={Object.keys(periodData).length}
+        extraSheets={extraSheets}
       />
 
       {/* Main Dashboard Content */}
@@ -1003,6 +1083,9 @@ export default function App() {
               days={days}
               lines={filteredLines}
               selectedProdLine={filters.prodLine}
+              monthlyEfficiency={dynamicMonthlyEfficiency}
+              onUpdateMonthlyEfficiency={handleUpdateMonthlyEfficiency}
+              onSaveOnWeb={() => handleSaveOnWebNow()}
             />
 
             {/* Daily OEC Matrix Table matching image */}
@@ -1022,6 +1105,17 @@ export default function App() {
               activePeriodLabel={formatPeriodLabel(filters.year, activePeriodKey)}
             />
           </>
+        ) : activeTab === 'upph-oec' ? (
+          /* Sheet UPPH: Original UPPH OEC (人效日清) with Editable Monthly Charts & Dual Matrices */
+          <UpphOecView
+            data={upphSheet}
+            onUpdateData={handleUpdateUpphSheet}
+            dailyOecLines={lines}
+            onSaveOnWeb={(customTitle?: string) => handleSaveOnWebNow(customTitle)}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isSyncing={isSyncing}
+            plantName={filters.plant === 'ทั้งหมด' ? 'HTC Ref(泰国冰箱)' : filters.plant}
+          />
         ) : activeTab === 'daily-trend' ? (
           /* Sheet 2: Daily Trend Charts & Live Daily Data Recording Table */
           <DailyTrendView
@@ -1036,13 +1130,38 @@ export default function App() {
             hasUnsavedChanges={hasUnsavedChanges}
             isSyncing={isSyncing}
           />
-        ) : (
+        ) : activeTab === 'summary-efficiency' ? (
           /* Sheet 3: Summary Efficiency Line A & Line B (AVG & Actual YTD) */
           <SummaryEfficiencyView
             data={dynamicMonthlyEfficiency}
             onUpdateData={handleUpdateMonthlyEfficiency}
             plantName={filters.plant === 'ทั้งหมด' ? 'HTC Ref(泰国冰箱)' : filters.plant}
+            onSaveOnWeb={() => handleSaveOnWebNow()}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isSyncing={isSyncing}
           />
+        ) : (
+          /* Sheet 4 & Sheet 5: Editable Custom / Line OEC Sheets on Web */
+          (() => {
+            const currentSheet =
+              extraSheets.find(s => s.id === activeTab) || extraSheets[0];
+            if (!currentSheet) return null;
+            return (
+              <EditableWebSheetView
+                sheet={currentSheet}
+                onUpdateSheet={handleUpdateExtraSheet}
+                lines={lines}
+                days={days}
+                onUpdateDailyCell={handleUpdateCellValue}
+                onAddDay={handleAddDay}
+                onSaveOnWeb={(customTitle?: string) => handleSaveOnWebNow(customTitle)}
+                hasUnsavedChanges={hasUnsavedChanges}
+                isSyncing={isSyncing}
+                plantName={filters.plant === 'ทั้งหมด' ? 'HTC Ref(泰国冰箱)' : filters.plant}
+                activePeriodLabel={formatPeriodLabel(filters.year, activePeriodKey)}
+              />
+            );
+          })()
         )}
       </main>
 
