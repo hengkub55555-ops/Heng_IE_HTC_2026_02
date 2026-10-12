@@ -20,6 +20,8 @@
         "webSnapshots": { "type": "array" },
         "extraSheets": { "type": "array" },
         "upphSheet": { "type": "object" },
+        "lineIdleSheet": { "type": "object" },
+        "summaryPerformance": { "type": "array" },
         "updatedAt": { "type": "string" }
       },
       "required": ["id", "lines", "days"]

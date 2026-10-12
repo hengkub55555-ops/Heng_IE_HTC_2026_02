@@ -491,6 +491,42 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
+              onClick={() => onTabChange('line-idle')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'line-idle'
+                  ? 'border-[#0b65b8] text-[#0b65b8] bg-blue-50/70 shadow-xs'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-rose-600" />
+              <span>
+                {t(
+                  'Sheet Line Stop: FA Line Idle Time (总装停机时)',
+                  'Sheet Line Stop: FA Line Idle Time (总装停机时)',
+                  'Sheet Line Stop: FA Line Idle Time (总装停机时)'
+                )}
+              </span>
+            </button>
+
+            <button
+              onClick={() => onTabChange('summary-performance')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'summary-performance'
+                  ? 'border-[#0070c0] text-[#0070c0] bg-blue-50/70 shadow-xs'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-amber-600" />
+              <span>
+                {t(
+                  'Sheet Summary Performance: UPH , UPPH , Line Stop',
+                  'Sheet Summary Performance: UPH , UPPH , Line Stop',
+                  'Sheet 综合汇总: UPH , UPPH , Line Stop'
+                )}
+              </span>
+            </button>
+
+            <button
               onClick={() => onTabChange('daily-trend')}
               className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
                 activeTab === 'daily-trend'

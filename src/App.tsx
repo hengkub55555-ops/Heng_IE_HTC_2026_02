@@ -25,6 +25,8 @@ import {
   INITIAL_MONTHLY_EFFICIENCY,
   INITIAL_EXTRA_SHEETS,
   INITIAL_UPPH_SHEET_DATA,
+  INITIAL_LINE_IDLE_SHEET_DATA,
+  INITIAL_SUMMARY_PERFORMANCE_DATA,
 } from './data/initialData';
 import { 
   LineOECData, 
@@ -37,11 +39,15 @@ import {
   PeriodStorageState,
   WebSavedSnapshot,
   EditableCustomSheet,
-  UpphSheetData
+  UpphSheetData,
+  LineIdleSheetData,
+  SummaryPerformanceRow
 } from './types/oec';
 import { SummaryEfficiencyView } from './components/SummaryEfficiencyView';
 import { EditableWebSheetView } from './components/EditableWebSheetView';
 import { UpphOecView } from './components/UpphOecView';
+import { LineIdleTimeView } from './components/LineIdleTimeView';
+import { SummaryPerformanceView } from './components/SummaryPerformanceView';
 import { downloadOECTemplate, exportToCSV } from './utils/excelHelper';
 import { 
   testFirestoreConnection, 
@@ -64,6 +70,8 @@ export default function App() {
   const STORAGE_KEY_SNAPSHOTS = 'oec_web_snapshots_v1';
   const STORAGE_KEY_EXTRA_SHEETS = 'oec_extra_sheets_v1';
   const STORAGE_KEY_UPPH_SHEET = 'oec_upph_sheet_v1';
+  const STORAGE_KEY_LINE_IDLE = 'oec_line_idle_sheet_v1';
+  const STORAGE_KEY_SUMMARY_PERF = 'oec_summary_perf_v1';
 
   // Sheet Tab State
   const [activeTab, setActiveTab] = useState<ActiveSheetTab>(() => {
@@ -143,6 +151,24 @@ export default function App() {
       return saved ? JSON.parse(saved) : INITIAL_UPPH_SHEET_DATA;
     } catch {
       return INITIAL_UPPH_SHEET_DATA;
+    }
+  });
+
+  const [lineIdleSheet, setLineIdleSheet] = useState<LineIdleSheetData>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_LINE_IDLE);
+      return saved ? JSON.parse(saved) : INITIAL_LINE_IDLE_SHEET_DATA;
+    } catch {
+      return INITIAL_LINE_IDLE_SHEET_DATA;
+    }
+  });
+
+  const [summaryPerformance, setSummaryPerformance] = useState<SummaryPerformanceRow[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SUMMARY_PERF);
+      return saved ? JSON.parse(saved) : INITIAL_SUMMARY_PERFORMANCE_DATA;
+    } catch {
+      return INITIAL_SUMMARY_PERFORMANCE_DATA;
     }
   });
 
@@ -347,6 +373,8 @@ export default function App() {
         webSnapshots: override?.webSnapshots ?? webSnapshots,
         extraSheets: override?.extraSheets ?? extraSheets,
         upphSheet: override?.upphSheet ?? upphSheet,
+        lineIdleSheet: override?.lineIdleSheet ?? lineIdleSheet,
+        summaryPerformance: override?.summaryPerformance ?? summaryPerformance,
       });
       setLastSyncTime(new Date());
       setIsOnline(true);
@@ -377,6 +405,8 @@ export default function App() {
           webSnapshots,
           extraSheets,
           upphSheet,
+          lineIdleSheet,
+          summaryPerformance,
         });
         setLastSyncTime(new Date());
         setIsOnline(true);
@@ -404,6 +434,8 @@ export default function App() {
       webSnapshots,
       extraSheets,
       upphSheet,
+      lineIdleSheet,
+      summaryPerformance,
     }).then(cloudData => {
       if (cloudData) {
         if (cloudData.lines && cloudData.lines.length > 0) setLines(cloudData.lines);
@@ -414,6 +446,8 @@ export default function App() {
         if (cloudData.webSnapshots) setWebSnapshots(cloudData.webSnapshots);
         if (cloudData.extraSheets && cloudData.extraSheets.length > 0) setExtraSheets(cloudData.extraSheets);
         if (cloudData.upphSheet && cloudData.upphSheet.lines) setUpphSheet(cloudData.upphSheet);
+        if (cloudData.lineIdleSheet && cloudData.lineIdleSheet.dailyRows) setLineIdleSheet(cloudData.lineIdleSheet);
+        if (cloudData.summaryPerformance && cloudData.summaryPerformance.length > 0) setSummaryPerformance(cloudData.summaryPerformance);
       }
     });
 
@@ -444,6 +478,12 @@ export default function App() {
         }
         if (cloudData.upphSheet && cloudData.upphSheet.lines) {
           setUpphSheet(cloudData.upphSheet);
+        }
+        if (cloudData.lineIdleSheet && cloudData.lineIdleSheet.dailyRows) {
+          setLineIdleSheet(cloudData.lineIdleSheet);
+        }
+        if (cloudData.summaryPerformance && cloudData.summaryPerformance.length > 0) {
+          setSummaryPerformance(cloudData.summaryPerformance);
         }
       },
       (err) => {
@@ -527,6 +567,22 @@ export default function App() {
       console.error('Error saving upphSheet:', e);
     }
   }, [upphSheet]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_LINE_IDLE, JSON.stringify(lineIdleSheet));
+    } catch (e) {
+      console.error('Error saving lineIdleSheet:', e);
+    }
+  }, [lineIdleSheet]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_SUMMARY_PERF, JSON.stringify(summaryPerformance));
+    } catch (e) {
+      console.error('Error saving summaryPerformance:', e);
+    }
+  }, [summaryPerformance]);
 
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ message, type });
@@ -691,6 +747,8 @@ export default function App() {
       actionItems,
       extraSheets,
       upphSheet,
+      lineIdleSheet,
+      summaryPerformance,
     };
 
     const nextSnapshots = [newSnapshot, ...webSnapshots].slice(0, 15);
@@ -707,6 +765,8 @@ export default function App() {
       webSnapshots: nextSnapshots,
       extraSheets,
       upphSheet,
+      lineIdleSheet,
+      summaryPerformance,
     });
 
     showToast(`บันทึกข้อมูลบน Web สำเร็จ! (${formatPeriodLabel(filters.year, activePeriodKey)})`);
@@ -893,6 +953,8 @@ export default function App() {
       setActionItems(INITIAL_ACTION_ITEMS);
       setExtraSheets(INITIAL_EXTRA_SHEETS);
       setUpphSheet(INITIAL_UPPH_SHEET_DATA);
+      setLineIdleSheet(INITIAL_LINE_IDLE_SHEET_DATA);
+      setSummaryPerformance(INITIAL_SUMMARY_PERFORMANCE_DATA);
       setHasUnsavedChanges(false);
       localStorage.removeItem(STORAGE_KEY_LINES);
       localStorage.removeItem(STORAGE_KEY_DAYS);
@@ -900,6 +962,8 @@ export default function App() {
       localStorage.removeItem(STORAGE_KEY_EFFICIENCY);
       localStorage.removeItem(STORAGE_KEY_EXTRA_SHEETS);
       localStorage.removeItem(STORAGE_KEY_UPPH_SHEET);
+      localStorage.removeItem(STORAGE_KEY_LINE_IDLE);
+      localStorage.removeItem(STORAGE_KEY_SUMMARY_PERF);
       syncToCloud({
         lines: INITIAL_LINE_DATA,
         days: INITIAL_DAYS,
@@ -907,6 +971,8 @@ export default function App() {
         actionItems: INITIAL_ACTION_ITEMS,
         extraSheets: INITIAL_EXTRA_SHEETS,
         upphSheet: INITIAL_UPPH_SHEET_DATA,
+        lineIdleSheet: INITIAL_LINE_IDLE_SHEET_DATA,
+        summaryPerformance: INITIAL_SUMMARY_PERFORMANCE_DATA,
       });
       showToast('รีเซ็ตข้อมูลกลับสู่ค่ามาตรฐานสำเร็จ');
     }
@@ -1002,6 +1068,18 @@ export default function App() {
     setUpphSheet(newUpphData);
     setHasUnsavedChanges(true);
     syncToCloud({ upphSheet: newUpphData });
+  };
+
+  const handleUpdateLineIdleSheet = (newIdleData: LineIdleSheetData) => {
+    setLineIdleSheet(newIdleData);
+    setHasUnsavedChanges(true);
+    syncToCloud({ lineIdleSheet: newIdleData });
+  };
+
+  const handleUpdateSummaryPerformance = (newRows: SummaryPerformanceRow[]) => {
+    setSummaryPerformance(newRows);
+    setHasUnsavedChanges(true);
+    syncToCloud({ summaryPerformance: newRows });
   };
 
   const handleUpdateActionItems = (newActions: ActionItem[]) => {
@@ -1115,6 +1193,28 @@ export default function App() {
             hasUnsavedChanges={hasUnsavedChanges}
             isSyncing={isSyncing}
             plantName={filters.plant === 'ทั้งหมด' ? 'HTC Ref(泰国冰箱)' : filters.plant}
+          />
+        ) : activeTab === 'line-idle' ? (
+          /* Sheet Line Stop: FA Line Idle Time (总装停机时) matching exact uploaded dashboard */
+          <LineIdleTimeView
+            data={lineIdleSheet}
+            onUpdateData={handleUpdateLineIdleSheet}
+            onSaveOnWeb={(customTitle?: string) => handleSaveOnWebNow(customTitle)}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isSyncing={isSyncing}
+          />
+        ) : activeTab === 'summary-performance' ? (
+          /* Sheet Summary Performance: UPH, UPPH & Line Stop Integrated Master Sheet */
+          <SummaryPerformanceView
+            rows={summaryPerformance}
+            onUpdateRows={handleUpdateSummaryPerformance}
+            monthlyEfficiency={dynamicMonthlyEfficiency}
+            upphSheet={upphSheet}
+            lineIdleSheet={lineIdleSheet}
+            onSaveOnWeb={(customTitle?: string) => handleSaveOnWebNow(customTitle)}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isSyncing={isSyncing}
+            onNavigateToSheet={(tab) => setActiveTab(tab)}
           />
         ) : activeTab === 'daily-trend' ? (
           /* Sheet 2: Daily Trend Charts & Live Daily Data Recording Table */
