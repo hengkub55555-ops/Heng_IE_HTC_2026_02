@@ -483,8 +483,11 @@ export const DailyMatrixTable: React.FC<DailyMatrixTableProps> = ({
                           isCalculated = true;
                           const p = line.planning[d.day];
                           const a = line.act[d.day];
-                          if (a !== null && a !== undefined) {
-                            cellVal = Number(a) - Number(p || 0);
+                          if (
+                            (a !== null && a !== undefined) ||
+                            (p !== null && p !== undefined)
+                          ) {
+                            cellVal = Number(a || 0) - Number(p || 0);
                             isNegative = cellVal < 0;
                           }
                         } else if (cat.key === 'uph') {
