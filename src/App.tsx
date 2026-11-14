@@ -21,6 +21,11 @@ import { generateMonthDayColumns, formatPeriodLabel, THAI_MONTHS } from './utils
 import {
   INITIAL_DAYS,
   INITIAL_LINE_DATA,
+  INITIAL_OCT_2026_DAYS,
+  INITIAL_OCT_2026_LINES,
+  INITIAL_NOV_2026_DAYS,
+  INITIAL_NOV_2026_LINES,
+  INITIAL_PERIOD_DATA,
   INITIAL_ACTION_ITEMS,
   INITIAL_MONTHLY_EFFICIENCY,
   INITIAL_EXTRA_SHEETS,
@@ -72,6 +77,33 @@ export default function App() {
   const STORAGE_KEY_UPPH_SHEET = 'oec_upph_sheet_v1';
   const STORAGE_KEY_LINE_IDLE = 'oec_line_idle_sheet_v1';
   const STORAGE_KEY_SUMMARY_PERF = 'oec_summary_perf_v1';
+  const STORAGE_KEY_OCT_SEEDED = 'oec_oct_2026_seeded_v1';
+  const STORAGE_KEY_NOV_SEEDED = 'oec_nov_2026_seeded_v1';
+  const STORAGE_KEY_SEP_SEEDED = 'oec_sep_2026_full_v1';
+
+  const hasPeriodActualData = (entry?: { lines?: LineOECData[] }) => {
+    return Boolean(
+      entry?.lines?.some(l =>
+        Object.values(l.act || {}).some(v => v !== null && v !== undefined)
+      )
+    );
+  };
+
+  const hasFullSeptemberData = (entry?: { days?: DayColumn[]; lines?: LineOECData[] }) => {
+    return Boolean(entry?.days?.some(d => d.day === 29) && hasPeriodActualData(entry));
+  };
+
+  const mergeMonthlyWithRecentDefaults = (rows: MonthlyEfficiencyRow[]): MonthlyEfficiencyRow[] => {
+    const map = new Map<string, MonthlyEfficiencyRow>();
+    rows.forEach(r => map.set(r.month, r));
+    ['2026-09', '2026-10', '2026-11'].forEach(mKey => {
+      const initRow = INITIAL_MONTHLY_EFFICIENCY.find(r => r.month === mKey);
+      if (initRow && !map.has(mKey)) {
+        map.set(mKey, initRow);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
+  };
 
   // Sheet Tab State
   const [activeTab, setActiveTab] = useState<ActiveSheetTab>(() => {
@@ -86,45 +118,90 @@ export default function App() {
   // State
   const [lines, setLines] = useState<LineOECData[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_LINES);
-      return saved ? JSON.parse(saved) : INITIAL_LINE_DATA;
+      const isSepSeeded = localStorage.getItem(STORAGE_KEY_SEP_SEEDED) === '1';
+      const savedPeriodsRaw = localStorage.getItem(STORAGE_KEY_PERIODS);
+      if (isSepSeeded) {
+        if (savedPeriodsRaw) {
+          const parsedPeriods = JSON.parse(savedPeriodsRaw) as PeriodStorageState;
+          if (hasFullSeptemberData(parsedPeriods['2026-09'])) {
+            return parsedPeriods['2026-09'].lines;
+          }
+        }
+        const saved = localStorage.getItem(STORAGE_KEY_LINES);
+        return saved ? JSON.parse(saved) : INITIAL_LINE_DATA;
+      }
     } catch {
-      return INITIAL_LINE_DATA;
+      // fall through to September 2026 default
     }
+    return INITIAL_LINE_DATA;
   });
 
   const [days, setDays] = useState<DayColumn[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_DAYS);
-      return saved ? JSON.parse(saved) : INITIAL_DAYS;
+      const isSepSeeded = localStorage.getItem(STORAGE_KEY_SEP_SEEDED) === '1';
+      const savedPeriodsRaw = localStorage.getItem(STORAGE_KEY_PERIODS);
+      if (isSepSeeded) {
+        if (savedPeriodsRaw) {
+          const parsedPeriods = JSON.parse(savedPeriodsRaw) as PeriodStorageState;
+          if (hasFullSeptemberData(parsedPeriods['2026-09']) && parsedPeriods['2026-09'].days?.length) {
+            return parsedPeriods['2026-09'].days;
+          }
+        }
+        const saved = localStorage.getItem(STORAGE_KEY_DAYS);
+        return saved ? JSON.parse(saved) : INITIAL_DAYS;
+      }
     } catch {
-      return INITIAL_DAYS;
+      // fall through to September 2026 default
     }
+    return INITIAL_DAYS;
   });
 
   const [monthlyEfficiency, setMonthlyEfficiency] = useState<MonthlyEfficiencyRow[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_EFFICIENCY);
-      return saved ? JSON.parse(saved) : INITIAL_MONTHLY_EFFICIENCY;
+      if (saved) {
+        const parsed = JSON.parse(saved) as MonthlyEfficiencyRow[];
+        const isSepSeeded = localStorage.getItem(STORAGE_KEY_SEP_SEEDED) === '1';
+        if (isSepSeeded) {
+          return mergeMonthlyWithRecentDefaults(parsed);
+        }
+        const map = new Map<string, MonthlyEfficiencyRow>();
+        parsed.forEach(r => map.set(r.month, r));
+        ['2026-09', '2026-10', '2026-11'].forEach(mKey => {
+          const initRow = INITIAL_MONTHLY_EFFICIENCY.find(r => r.month === mKey);
+          if (initRow && (mKey === '2026-09' || !map.has(mKey))) {
+            map.set(mKey, initRow);
+          }
+        });
+        return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
+      }
     } catch {
-      return INITIAL_MONTHLY_EFFICIENCY;
+      // ignore
     }
+    return INITIAL_MONTHLY_EFFICIENCY;
   });
 
   const [periodData, setPeriodData] = useState<PeriodStorageState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_PERIODS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved) as PeriodStorageState;
+        const next: PeriodStorageState = { ...parsed };
+        if (!hasFullSeptemberData(next['2026-09'])) {
+          next['2026-09'] = INITIAL_PERIOD_DATA['2026-09'];
+        }
+        if (!hasPeriodActualData(next['2026-10'])) {
+          next['2026-10'] = INITIAL_PERIOD_DATA['2026-10'];
+        }
+        if (!hasPeriodActualData(next['2026-11'])) {
+          next['2026-11'] = INITIAL_PERIOD_DATA['2026-11'];
+        }
+        return next;
+      }
     } catch {
       // ignore
     }
-    return {
-      '2026-09': {
-        lines: INITIAL_LINE_DATA,
-        days: INITIAL_DAYS,
-        updatedAt: new Date().toISOString(),
-      },
-    };
+    return INITIAL_PERIOD_DATA;
   });
 
   const [webSnapshots, setWebSnapshots] = useState<WebSavedSnapshot[]>(() => {
@@ -166,20 +243,48 @@ export default function App() {
   const [summaryPerformance, setSummaryPerformance] = useState<SummaryPerformanceRow[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SUMMARY_PERF);
-      return saved ? JSON.parse(saved) : INITIAL_SUMMARY_PERFORMANCE_DATA;
+      if (saved) {
+        let parsed = JSON.parse(saved) as SummaryPerformanceRow[];
+        const initSep = INITIAL_SUMMARY_PERFORMANCE_DATA.find(r => r.period === '2026-09');
+        if (initSep) {
+          const idx = parsed.findIndex(r => r.period === '2026-09');
+          if (idx === -1) {
+            parsed = [...parsed, initSep];
+          } else if (parsed[idx].totalAct === 101779) {
+            parsed = parsed.map((r, i) => (i === idx ? initSep : r));
+          }
+        }
+        const initOct = INITIAL_SUMMARY_PERFORMANCE_DATA.find(r => r.period === '2026-10');
+        if (initOct) {
+          const idx = parsed.findIndex(r => r.period === '2026-10');
+          if (idx === -1) {
+            parsed = [...parsed, initOct];
+          } else if (parsed[idx].totalAct === 39850 && parsed[idx].totalPlan === 42000) {
+            parsed = parsed.map((r, i) => (i === idx ? initOct : r));
+          }
+        }
+        const initNov = INITIAL_SUMMARY_PERFORMANCE_DATA.find(r => r.period === '2026-11');
+        if (initNov && !parsed.some(r => r.period === '2026-11')) {
+          parsed = [...parsed, initNov];
+        }
+        return parsed;
+      }
     } catch {
-      return INITIAL_SUMMARY_PERFORMANCE_DATA;
+      // ignore
     }
+    return INITIAL_SUMMARY_PERFORMANCE_DATA;
   });
 
   const [filters, setFilters] = useState<OECFilterState>({
     plant: 'ทั้งหมด',
     year: 2026,
-    month: 'All',
+    month: '2026-09',
     prodLine: 'All',
   });
 
   const activePeriodKey = filters.month === 'All' ? `${filters.year}-09` : filters.month;
+  const activePeriodKeyRef = useRef<string>(activePeriodKey);
+  activePeriodKeyRef.current = activePeriodKey;
 
   // Dynamically compute monthly production linked directly to table edits
   const dynamicMonthlyProd = useMemo(() => {
@@ -424,7 +529,15 @@ export default function App() {
       setIsOnline(connected);
     });
 
-    // Seed initial data to cloud if new, then listen to changes
+    try {
+      localStorage.setItem(STORAGE_KEY_OCT_SEEDED, '1');
+      localStorage.setItem(STORAGE_KEY_NOV_SEEDED, '1');
+      localStorage.setItem(STORAGE_KEY_SEP_SEEDED, '1');
+    } catch {
+      // ignore
+    }
+
+    // Seed initial data to cloud if new, or inject/upgrade Sep/Oct/Nov 2026 periods if cloud doc predates them
     initOrSeedCloudData({
       lines,
       days,
@@ -438,9 +551,121 @@ export default function App() {
       summaryPerformance,
     }).then(cloudData => {
       if (cloudData) {
-        if (cloudData.lines && cloudData.lines.length > 0) setLines(cloudData.lines);
-        if (cloudData.days && cloudData.days.length > 0) setDays(cloudData.days);
-        if (cloudData.monthlyEfficiency && cloudData.monthlyEfficiency.length > 0) setMonthlyEfficiency(cloudData.monthlyEfficiency);
+        const cloudHasFullSep = hasFullSeptemberData(cloudData.periodData?.['2026-09']);
+        const cloudHasOct = hasPeriodActualData(cloudData.periodData?.['2026-10']);
+        const cloudHasNov = hasPeriodActualData(cloudData.periodData?.['2026-11']);
+
+        if (!cloudHasFullSep || !cloudHasOct || !cloudHasNov) {
+          const mergedPeriodData: PeriodStorageState = {
+            ...(cloudData.periodData || {}),
+            '2026-09': cloudHasFullSep
+              ? cloudData.periodData!['2026-09']
+              : INITIAL_PERIOD_DATA['2026-09'],
+            '2026-10': cloudHasOct
+              ? cloudData.periodData!['2026-10']
+              : INITIAL_PERIOD_DATA['2026-10'],
+            '2026-11': cloudHasNov
+              ? cloudData.periodData!['2026-11']
+              : INITIAL_PERIOD_DATA['2026-11'],
+          };
+
+          const baseEff = cloudData.monthlyEfficiency?.length
+            ? cloudData.monthlyEfficiency
+            : INITIAL_MONTHLY_EFFICIENCY;
+          const effMap = new Map<string, MonthlyEfficiencyRow>();
+          baseEff.forEach(r => effMap.set(r.month, r));
+          ['2026-09', '2026-10', '2026-11'].forEach(mKey => {
+            const initRow = INITIAL_MONTHLY_EFFICIENCY.find(r => r.month === mKey);
+            if (
+              initRow &&
+              ((mKey === '2026-09' && !cloudHasFullSep) ||
+                (mKey === '2026-10' && !cloudHasOct) ||
+                (mKey === '2026-11' && !cloudHasNov) ||
+                !effMap.has(mKey))
+            ) {
+              effMap.set(mKey, initRow);
+            }
+          });
+          const mergedEff = Array.from(effMap.values()).sort((a, b) =>
+            a.month.localeCompare(b.month)
+          );
+
+          const baseSummary = cloudData.summaryPerformance?.length
+            ? cloudData.summaryPerformance
+            : INITIAL_SUMMARY_PERFORMANCE_DATA;
+          let mergedSummary = [...baseSummary];
+          const initSepSummary = INITIAL_SUMMARY_PERFORMANCE_DATA.find(r => r.period === '2026-09');
+          if (initSepSummary) {
+            mergedSummary = mergedSummary.some(r => r.period === '2026-09')
+              ? mergedSummary.map(r =>
+                  r.period === '2026-09' && r.totalAct === 101779 ? initSepSummary : r
+                )
+              : [...mergedSummary, initSepSummary];
+          }
+          const initOctSummary = INITIAL_SUMMARY_PERFORMANCE_DATA.find(r => r.period === '2026-10');
+          if (initOctSummary) {
+            mergedSummary = mergedSummary.some(r => r.period === '2026-10')
+              ? mergedSummary.map(r =>
+                  r.period === '2026-10' && r.totalAct === 39850 ? initOctSummary : r
+                )
+              : [...mergedSummary, initOctSummary];
+          }
+          const initNovSummary = INITIAL_SUMMARY_PERFORMANCE_DATA.find(r => r.period === '2026-11');
+          if (initNovSummary && !mergedSummary.some(r => r.period === '2026-11')) {
+            mergedSummary = [...mergedSummary, initNovSummary];
+          }
+
+          const activeKey = activePeriodKeyRef.current;
+          const activeEntry = mergedPeriodData[activeKey] || INITIAL_PERIOD_DATA['2026-09'];
+          setLines(activeEntry.lines);
+          setDays(activeEntry.days);
+          setPeriodData(mergedPeriodData);
+          setMonthlyEfficiency(mergedEff);
+          setSummaryPerformance(mergedSummary);
+          if (cloudData.actionItems && cloudData.actionItems.length > 0) {
+            setActionItems(cloudData.actionItems);
+          }
+          if (cloudData.webSnapshots) setWebSnapshots(cloudData.webSnapshots);
+          if (cloudData.extraSheets && cloudData.extraSheets.length > 0) {
+            setExtraSheets(cloudData.extraSheets);
+          }
+          if (cloudData.upphSheet && cloudData.upphSheet.lines) {
+            setUpphSheet(cloudData.upphSheet);
+          }
+          if (cloudData.lineIdleSheet && cloudData.lineIdleSheet.dailyRows) {
+            setLineIdleSheet(cloudData.lineIdleSheet);
+          }
+
+          // Persist updated 2026-09 / 2026-10 / 2026-11 seeded data to Cloud Firestore once
+          saveOecDashboardOnline({
+            lines: activeEntry.lines,
+            days: activeEntry.days,
+            periodData: mergedPeriodData,
+            monthlyEfficiency: mergedEff,
+            actionItems: cloudData.actionItems && cloudData.actionItems.length > 0 ? cloudData.actionItems : actionItems,
+            webSnapshots: cloudData.webSnapshots ?? webSnapshots,
+            extraSheets: cloudData.extraSheets && cloudData.extraSheets.length > 0 ? cloudData.extraSheets : extraSheets,
+            upphSheet: cloudData.upphSheet && cloudData.upphSheet.lines ? cloudData.upphSheet : upphSheet,
+            lineIdleSheet: cloudData.lineIdleSheet && cloudData.lineIdleSheet.dailyRows ? cloudData.lineIdleSheet : lineIdleSheet,
+            summaryPerformance: mergedSummary,
+          }).catch(err => console.warn('September 2026 cloud migration skipped:', err));
+          return;
+        }
+
+        const targetKey = activePeriodKeyRef.current;
+        const cloudPeriodEntry = cloudData.periodData?.[targetKey];
+        if (cloudPeriodEntry?.lines && cloudPeriodEntry.lines.length > 0) {
+          setLines(cloudPeriodEntry.lines);
+          if (cloudPeriodEntry.days && cloudPeriodEntry.days.length > 0) {
+            setDays(cloudPeriodEntry.days);
+          }
+        } else {
+          if (cloudData.lines && cloudData.lines.length > 0) setLines(cloudData.lines);
+          if (cloudData.days && cloudData.days.length > 0) setDays(cloudData.days);
+        }
+        if (cloudData.monthlyEfficiency && cloudData.monthlyEfficiency.length > 0) {
+          setMonthlyEfficiency(mergeMonthlyWithRecentDefaults(cloudData.monthlyEfficiency));
+        }
         if (cloudData.actionItems && cloudData.actionItems.length > 0) setActionItems(cloudData.actionItems);
         if (cloudData.periodData) setPeriodData(cloudData.periodData);
         if (cloudData.webSnapshots) setWebSnapshots(cloudData.webSnapshots);
@@ -455,14 +680,30 @@ export default function App() {
       (cloudData) => {
         setIsOnline(true);
         setLastSyncTime(new Date());
-        if (cloudData.lines && cloudData.lines.length > 0) {
-          setLines(cloudData.lines);
+        // Skip pre-migration snapshots that do not yet contain full 2026-09 or 2026-11
+        if (
+          !hasFullSeptemberData(cloudData.periodData?.['2026-09']) ||
+          !hasPeriodActualData(cloudData.periodData?.['2026-11'])
+        ) {
+          return;
         }
-        if (cloudData.days && cloudData.days.length > 0) {
-          setDays(cloudData.days);
+        const targetKey = activePeriodKeyRef.current;
+        const cloudPeriodEntry = cloudData.periodData?.[targetKey];
+        if (cloudPeriodEntry?.lines && cloudPeriodEntry.lines.length > 0) {
+          setLines(cloudPeriodEntry.lines);
+          if (cloudPeriodEntry.days && cloudPeriodEntry.days.length > 0) {
+            setDays(cloudPeriodEntry.days);
+          }
+        } else {
+          if (cloudData.lines && cloudData.lines.length > 0) {
+            setLines(cloudData.lines);
+          }
+          if (cloudData.days && cloudData.days.length > 0) {
+            setDays(cloudData.days);
+          }
         }
         if (cloudData.monthlyEfficiency && cloudData.monthlyEfficiency.length > 0) {
-          setMonthlyEfficiency(cloudData.monthlyEfficiency);
+          setMonthlyEfficiency(mergeMonthlyWithRecentDefaults(cloudData.monthlyEfficiency));
         }
         if (cloudData.actionItems) {
           setActionItems(cloudData.actionItems);
@@ -593,8 +834,8 @@ export default function App() {
 
   // Switch period (Year / Month) and load or initialize that period's data on the Web
   const handleFilterChange = (newFilters: OECFilterState) => {
-    const oldPeriodKey = filters.month === 'All' ? `${filters.year}-09` : filters.month;
-    const newPeriodKey = newFilters.month === 'All' ? `${newFilters.year}-09` : newFilters.month;
+    const oldPeriodKey = filters.month === 'All' ? `${filters.year}-11` : filters.month;
+    const newPeriodKey = newFilters.month === 'All' ? `${newFilters.year}-11` : newFilters.month;
 
     // Save current lines & days into periodData before switching
     const updatedPeriodData: PeriodStorageState = {
@@ -610,14 +851,18 @@ export default function App() {
       if (updatedPeriodData[newPeriodKey]) {
         setLines(updatedPeriodData[newPeriodKey].lines);
         setDays(updatedPeriodData[newPeriodKey].days);
+      } else if (newPeriodKey === '2026-11') {
+        setLines(INITIAL_NOV_2026_LINES);
+        setDays(INITIAL_NOV_2026_DAYS);
+        updatedPeriodData[newPeriodKey] = INITIAL_PERIOD_DATA['2026-11'];
+      } else if (newPeriodKey === '2026-10') {
+        setLines(INITIAL_OCT_2026_LINES);
+        setDays(INITIAL_OCT_2026_DAYS);
+        updatedPeriodData[newPeriodKey] = INITIAL_PERIOD_DATA['2026-10'];
       } else if (newPeriodKey === '2026-09') {
         setLines(INITIAL_LINE_DATA);
         setDays(INITIAL_DAYS);
-        updatedPeriodData[newPeriodKey] = {
-          lines: INITIAL_LINE_DATA,
-          days: INITIAL_DAYS,
-          updatedAt: new Date().toISOString(),
-        };
+        updatedPeriodData[newPeriodKey] = INITIAL_PERIOD_DATA['2026-09'];
       } else {
         // Initialize clean lines and full calendar days for the newly selected Year-Month
         const [yStr, mStr] = newPeriodKey.split('-');
@@ -947,26 +1192,33 @@ export default function App() {
   // Reset to initial data from screenshot
   const handleResetData = () => {
     if (confirm('ยืนยันที่จะรีเซ็ตข้อมูลทั้งหมดกลับเป็นค่ามาตรฐานจากรูป?')) {
-      setLines(INITIAL_LINE_DATA);
-      setDays(INITIAL_DAYS);
+      setLines(INITIAL_NOV_2026_LINES);
+      setDays(INITIAL_NOV_2026_DAYS);
+      setPeriodData(INITIAL_PERIOD_DATA);
       setMonthlyEfficiency(INITIAL_MONTHLY_EFFICIENCY);
       setActionItems(INITIAL_ACTION_ITEMS);
       setExtraSheets(INITIAL_EXTRA_SHEETS);
       setUpphSheet(INITIAL_UPPH_SHEET_DATA);
       setLineIdleSheet(INITIAL_LINE_IDLE_SHEET_DATA);
       setSummaryPerformance(INITIAL_SUMMARY_PERFORMANCE_DATA);
+      setFilters(prev => ({ ...prev, year: 2026, month: '2026-11' }));
       setHasUnsavedChanges(false);
       localStorage.removeItem(STORAGE_KEY_LINES);
       localStorage.removeItem(STORAGE_KEY_DAYS);
+      localStorage.removeItem(STORAGE_KEY_PERIODS);
       localStorage.removeItem(STORAGE_KEY_ACTIONS);
       localStorage.removeItem(STORAGE_KEY_EFFICIENCY);
       localStorage.removeItem(STORAGE_KEY_EXTRA_SHEETS);
       localStorage.removeItem(STORAGE_KEY_UPPH_SHEET);
       localStorage.removeItem(STORAGE_KEY_LINE_IDLE);
       localStorage.removeItem(STORAGE_KEY_SUMMARY_PERF);
+      localStorage.setItem(STORAGE_KEY_OCT_SEEDED, '1');
+      localStorage.setItem(STORAGE_KEY_NOV_SEEDED, '1');
+      localStorage.setItem(STORAGE_KEY_SEP_SEEDED, '1');
       syncToCloud({
-        lines: INITIAL_LINE_DATA,
-        days: INITIAL_DAYS,
+        lines: INITIAL_NOV_2026_LINES,
+        days: INITIAL_NOV_2026_DAYS,
+        periodData: INITIAL_PERIOD_DATA,
         monthlyEfficiency: INITIAL_MONTHLY_EFFICIENCY,
         actionItems: INITIAL_ACTION_ITEMS,
         extraSheets: INITIAL_EXTRA_SHEETS,
