@@ -189,6 +189,8 @@ export const INITIAL_NOV_2026_DAYS: DayColumn[] = [
   { day: 11, weekday: 'WEN' },
   { day: 12, weekday: 'THU' },
   { day: 13, weekday: 'FRI' },
+  { day: 14, weekday: 'SAT' },
+  { day: 15, weekday: 'SUN' },
 ];
 
 export const INITIAL_NOV_2026_LINES: LineOECData[] = [
@@ -198,15 +200,15 @@ export const INITIAL_NOV_2026_LINES: LineOECData[] = [
     prodLine: 'Line A',
     planning: {
       2: 16644, 3: 1906, 4: 2613, 5: 3718, 6: 5300, 7: null,
-      9: 966, 10: 2037, 11: 2745, 12: 3454, 13: 5400,
+      9: 966, 10: 2037, 11: 2745, 12: 3454, 13: 5400, 14: null, 15: null,
     },
     act: {
       2: 1721, 3: 3600, 4: 3611, 5: 3678, 6: 3575, 7: 3205,
-      9: 3662, 10: 3632, 11: 3655, 12: 3476, 13: 3481,
+      9: 3662, 10: 3632, 11: 3655, 12: 3476, 13: 3486, 14: 3258, 15: 1781,
     },
     workTime: {
       2: 16, 3: 21, 4: 21, 5: 21, 6: 21, 7: 21,
-      9: 21, 10: 21, 11: 21, 12: 21, 13: 18,
+      9: 21, 10: 21, 11: 21, 12: 21, 13: 21, 14: 21, 15: 11,
     },
   },
   {
@@ -215,15 +217,15 @@ export const INITIAL_NOV_2026_LINES: LineOECData[] = [
     prodLine: 'Line B',
     planning: {
       2: 7075, 3: 1708, 4: 1747, 5: 2381, 6: 2599, 7: null,
-      9: 734, 10: 3086, 11: 2270, 12: 2371, 13: 3230,
+      9: 734, 10: 3086, 11: 2270, 12: 2371, 13: 3230, 14: null, 15: null,
     },
     act: {
       2: 1360, 3: 2418, 4: 2410, 5: 2350, 6: 1852, 7: 1962,
-      9: 2346, 10: 2095, 11: 2355, 12: 2241, 13: 2235,
+      9: 2346, 10: 2095, 11: 2355, 12: 2241, 13: 2261, 14: 2152, 15: 1507,
     },
     workTime: {
       2: 14, 3: 21, 4: 21, 5: 21, 6: 21, 7: 21,
-      9: 21, 10: 21, 11: 21, 12: 21, 13: 19,
+      9: 21, 10: 21, 11: 21, 12: 21, 13: 21, 14: 21, 15: 18,
     },
   },
 ];
@@ -764,7 +766,88 @@ export const INITIAL_FEB_2026_LINES: LineOECData[] = [
   },
 ];
 
+export const INITIAL_JAN_2026_DAYS: DayColumn[] = [
+  { day: 5, weekday: 'MON' },
+  { day: 6, weekday: 'TUE' },
+  { day: 7, weekday: 'WEN' },
+  { day: 8, weekday: 'THU' },
+  { day: 9, weekday: 'FRI' },
+  { day: 12, weekday: 'MON' },
+  { day: 13, weekday: 'TUE' },
+  { day: 14, weekday: 'WEN' },
+  { day: 15, weekday: 'THU' },
+  { day: 16, weekday: 'FRI' },
+  { day: 17, weekday: 'SAT' },
+  { day: 19, weekday: 'MON' },
+  { day: 20, weekday: 'TUE' },
+  { day: 21, weekday: 'WEN' },
+  { day: 22, weekday: 'THU' },
+  { day: 23, weekday: 'FRI' },
+  { day: 24, weekday: 'SAT' },
+  { day: 25, weekday: 'SUN' },
+  { day: 26, weekday: 'MON' },
+  { day: 27, weekday: 'TUE' },
+  { day: 28, weekday: 'WEN' },
+  { day: 29, weekday: 'THU' },
+  { day: 30, weekday: 'FRI' },
+];
+
+export const INITIAL_JAN_2026_LINES: LineOECData[] = [
+  {
+    id: 'line-a',
+    plant: 'HTC Ref(泰国冰箱)',
+    prodLine: 'Line A',
+    planning: {
+      5: 17, 6: 1462, 7: 1399, 8: 1300, 9: 1683,
+      12: 1450, 13: 6259, 14: 208, 15: 372, 16: 408, 17: null,
+      19: 580, 20: 3561, 21: 479, 22: 1412, 23: 1676, 24: null, 25: null,
+      26: 2147, 27: 6030, 28: 945, 29: 1322, 30: 1151,
+    },
+    act: {
+      5: 651, 6: 1339, 7: 1282, 8: 1287, 9: 1280,
+      12: 1358, 13: 1457, 14: 1045, 15: 1121, 16: 1503, 17: 60,
+      19: 1849, 20: 1845, 21: 1918, 22: 1876, 23: 1395, 24: 1590, 25: 311,
+      26: 2236, 27: 1690, 28: 1846, 29: 1728, 30: 655,
+    },
+    workTime: {
+      5: 27, 6: 9, 7: 11, 8: 10, 9: 13,
+      12: 25, 13: 10, 14: 7, 15: 10, 16: 10, 17: 2,
+      19: 21, 20: 23, 21: 21, 22: 22, 23: 22, 24: 31, 25: 4,
+      26: 24, 27: 21, 28: 21, 29: 18, 30: 10,
+    },
+  },
+  {
+    id: 'line-b',
+    plant: 'HTC Ref(泰国冰箱)',
+    prodLine: 'Line B',
+    planning: {
+      5: 2, 6: 974, 7: 871, 8: 965, 9: 1056,
+      12: 983, 13: 1694, 14: 1018, 15: 699, 16: 964, 17: null,
+      19: 893, 20: 4020, 21: 837, 22: 1041, 23: 168, 24: null, 25: null,
+      26: 559, 27: 3074, 28: 48, 29: 54, 30: 66,
+    },
+    act: {
+      5: 661, 6: 895, 7: 790, 8: 804, 9: 908,
+      12: 361, 13: 1033, 14: 881, 15: 1001, 16: 840, 17: 310,
+      19: 895, 20: 1018, 21: 1014, 22: 808, 23: 896, 24: 568, 25: null,
+      26: 783, 27: 730, 28: 849, 29: 829, 30: 291,
+    },
+    workTime: {
+      5: 20, 6: 21, 7: 18, 8: 21, 9: 20,
+      12: 13, 13: 34, 14: 20, 15: 20, 16: 20, 17: 8,
+      19: 21, 20: 21, 21: 20, 22: 21, 23: 20, 24: 15, 25: null,
+      26: 21, 27: 21, 28: 20, 29: 21, 30: 10,
+    },
+  },
+];
+
 export const INITIAL_PERIOD_DATA: PeriodStorageState = {
+  '2026-01': {
+    lines: INITIAL_JAN_2026_LINES,
+    days: INITIAL_JAN_2026_DAYS,
+    updatedAt: '2026-01-30T17:00:00.000Z',
+    note: 'ข้อมูลประจำเดือน 2026-01 (มกราคม)',
+  },
   '2026-02': {
     lines: INITIAL_FEB_2026_LINES,
     days: INITIAL_FEB_2026_DAYS,
@@ -822,7 +905,7 @@ export const INITIAL_PERIOD_DATA: PeriodStorageState = {
   '2026-11': {
     lines: INITIAL_NOV_2026_LINES,
     days: INITIAL_NOV_2026_DAYS,
-    updatedAt: '2026-11-13T18:52:00.000Z',
+    updatedAt: '2026-11-15T18:00:00.000Z',
     note: 'ข้อมูลประจำเดือน 2026-11 (พฤศจิกายน)',
   },
 };
@@ -838,7 +921,7 @@ export const INITIAL_MONTHLY_PRODUCTION: MonthlyTrendItem[] = [
   { month: '2026-08', lineA: 40339, lineB: 50071 },
   { month: '2026-09', lineA: 63252, lineB: 45602 },
   { month: '2026-10', lineA: 65587, lineB: 47380 },
-  { month: '2026-11', lineA: 37296, lineB: 23624 },
+  { month: '2026-11', lineA: 42340, lineB: 27309 },
 ];
 
 export const INITIAL_MONTHLY_UPH: MonthlyTrendItem[] = [
@@ -852,7 +935,7 @@ export const INITIAL_MONTHLY_UPH: MonthlyTrendItem[] = [
   { month: '2026-08', lineA: 98, lineB: 100 },
   { month: '2026-09', lineA: 127, lineB: 95 },
   { month: '2026-10', lineA: 136, lineB: 96 },
-  { month: '2026-11', lineA: 169, lineB: 108 },
+  { month: '2026-11', lineA: 164, lineB: 104 },
 ];
 
 export const INITIAL_ACTION_ITEMS: ActionItem[] = [
@@ -889,17 +972,17 @@ export const INITIAL_MONTHLY_EFFICIENCY: MonthlyEfficiencyRow[] = [
   {
     month: '2026-01',
     monthNameTh: 'ม.ค. 2026',
-    lineAPlan: 33000,
+    lineAPlan: 33861,
     lineAAct: 31322,
     lineAUph: 84,
     lineATargetUph: 110,
-    lineAWorkHours: 373,
-    lineBPlan: 22000,
+    lineAWorkHours: 372,
+    lineBPlan: 19986,
     lineBAct: 17165,
     lineBUph: 40,
     lineBTargetUph: 100,
-    lineBWorkHours: 429,
-    notes: 'เริ่มเดินสายผลิตหลังปีใหม่ Line B ปรับจูนสถานีประตู',
+    lineBWorkHours: 426,
+    notes: 'ข้อมูลครบเดือน ม.ค. 2026 (วันที่ 5-30) ยอดผลิตรวม 48,487 ตัว (Line A 31,322 UPH 84, Line B 17,165 UPH 40, Gap -5,360)',
   },
   {
     month: '2026-02',
@@ -1040,16 +1123,16 @@ export const INITIAL_MONTHLY_EFFICIENCY: MonthlyEfficiencyRow[] = [
     month: '2026-11',
     monthNameTh: 'พ.ย. 2026',
     lineAPlan: 44783,
-    lineAAct: 37296,
-    lineAUph: 169,
+    lineAAct: 42340,
+    lineAUph: 164,
     lineATargetUph: 110,
-    lineAWorkHours: 223,
+    lineAWorkHours: 258,
     lineBPlan: 27201,
-    lineBAct: 23624,
-    lineBUph: 108,
+    lineBAct: 27309,
+    lineBUph: 104,
     lineBTargetUph: 100,
-    lineBWorkHours: 222,
-    notes: 'ข้อมูล พ.ย. 2026 (วันที่ 2-13) ยอดผลิตรวม 60,920 ตัว (Plan 71,984, Line A UPH 169, Line B UPH 108)',
+    lineBWorkHours: 263,
+    notes: 'ข้อมูล พ.ย. 2026 (วันที่ 2-15) ยอดผลิตรวม 69,649 ตัว (Plan 71,984, Line A UPH 164, Line B UPH 104)',
   },
 ];
 
@@ -1088,15 +1171,15 @@ export const INITIAL_EXTRA_SHEETS: EditableCustomSheet[] = [
         period: '2026-01',
         subLabel: 'ม.ค. 2026',
         modelName: 'HRF-2D Series (กะ A+B)',
-        plan: 33000,
+        plan: 33861,
         act: 31322,
-        gap: -1678,
-        workHours: 373,
+        gap: -2539,
+        workHours: 372,
         manpower: 145,
         uph: 84,
         targetUph: 110,
         lossMinutes: 180,
-        notes: 'เริ่มเดินสายผลิตต้นปี ปรับตั้งสถานี Foaming',
+        notes: 'ข้อมูลครบเดือน ม.ค. 2026 (วันที่ 5-30) ยอดผลิต 31,322 ตัว (UPH 84)',
       },
       {
         id: 's4-r2',
@@ -1254,15 +1337,15 @@ export const INITIAL_EXTRA_SHEETS: EditableCustomSheet[] = [
         period: '2026-01',
         subLabel: 'ม.ค. 2026',
         modelName: 'HRF-1D Classic',
-        plan: 22000,
+        plan: 19986,
         act: 17165,
-        gap: -4835,
-        workHours: 429,
+        gap: -2821,
+        workHours: 426,
         manpower: 115,
         uph: 40,
         targetUph: 100,
         lossMinutes: 260,
-        notes: 'ปรับจูนสถานีประกอบประตูและอบรมพนักงานใหม่',
+        notes: 'ข้อมูลครบเดือน ม.ค. 2026 (วันที่ 5-30) ยอดผลิต 17,165 ตัว (UPH 40)',
       },
       {
         id: 's5-r2',
@@ -1701,12 +1784,12 @@ export const INITIAL_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
     id: 'sp-2026-01',
     period: '2026-01',
     periodLabelTh: 'ม.ค. 2026',
-    totalPlan: 55000,
+    totalPlan: 53847,
     totalAct: 48487,
-    workHours: 802,
+    workHours: 798,
     lineAUph: 84,
     lineBUph: 40,
-    avgUph: 60,
+    avgUph: 61,
     targetUph: 105,
     lineAUpph: 0.94,
     lineBUpph: 0.62,
@@ -1720,7 +1803,7 @@ export const INITIAL_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
     idleOver5MinHours: 163.8,
     idleOver5MinRate: 20.6,
     targetIdleRate: 7.0,
-    notes: 'เริ่มปรับตั้งสายการผลิตต้นปี เร่งลดเวลาหยุดไลน์ >5 นาที',
+    notes: 'ข้อมูลครบเดือน ม.ค. 2026 (วันที่ 5-30) ยอดผลิตรวม 48,487 ตัว (Line A UPH 84, Line B UPH 40, UPH เฉลี่ย 61)',
   },
   {
     id: 'sp-2026-02',
@@ -1952,11 +2035,11 @@ export const INITIAL_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
     period: '2026-11',
     periodLabelTh: 'พ.ย. 2026 (MTD)',
     totalPlan: 71984,
-    totalAct: 60920,
-    workHours: 445,
-    lineAUph: 169,
-    lineBUph: 108,
-    avgUph: 138,
+    totalAct: 69649,
+    workHours: 521,
+    lineAUph: 164,
+    lineBUph: 104,
+    avgUph: 134,
     targetUph: 105,
     lineAUpph: 1.05,
     lineBUpph: 1.12,
@@ -1970,7 +2053,7 @@ export const INITIAL_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
     idleOver5MinHours: 0,
     idleOver5MinRate: 0,
     targetIdleRate: 7.0,
-    notes: 'ข้อมูลล่าสุด พ.ย. 2026 (วันที่ 2-13) ยอดผลิตรวม 60,920 ตัว, UPH โรงงานพุ่งเป็น 138 (Line A 169)',
+    notes: 'ข้อมูลล่าสุด พ.ย. 2026 (วันที่ 2-15) ยอดผลิตรวม 69,649 ตัว, UPH โรงงาน 134 (Line A 164)',
   },
 ];
 
