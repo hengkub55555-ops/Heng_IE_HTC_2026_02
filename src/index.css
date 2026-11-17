@@ -155,3 +155,26 @@
 [data-theme="midnight"] .text-slate-500 {
   color: #94a3b8 !important;
 }
+
+body {
+  font-family: "Plus Jakarta Sans", "Noto Sans Thai", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+}
+
+.font-mono,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+

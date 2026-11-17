@@ -10,6 +10,10 @@ import {
   SummaryPerformanceRow,
   PeriodStorageState,
 } from '../types/oec';
+import {
+  syncUpphSheetWithDailyOec,
+  syncSummaryPerformanceWithOecAndUpph,
+} from '../utils/upphCalculator';
 
 export const INITIAL_DAYS: DayColumn[] = [
   { day: 1, weekday: 'TUE' },
@@ -1471,96 +1475,82 @@ export const INITIAL_EXTRA_SHEETS: EditableCustomSheet[] = [
   },
 ];
 
-export const INITIAL_UPPH_SHEET_DATA: UpphSheetData = {
+const BASE_SEP_UPPH_SHEET_DATA: UpphSheetData = {
+  activeMonth: '2026-09',
   days: INITIAL_DAYS,
-  monthlyData: [
-    { month: '2026-01', prodLineA: 31322, prodLineB: 17165, upphLineA: 0.94, upphLineB: 0.62 },
-    { month: '2026-02', prodLineA: 38755, prodLineB: 18429, upphLineA: 0.81, upphLineB: 0.64 },
-    { month: '2026-03', prodLineA: 29243, prodLineB: 23047, upphLineA: 0.91, upphLineB: 0.73 },
-    { month: '2026-04', prodLineA: 25475, prodLineB: 25955, upphLineA: 0.81, upphLineB: 0.74 },
-    { month: '2026-05', prodLineA: 41651, prodLineB: 27899, upphLineA: 0.91, upphLineB: 0.73 },
-    { month: '2026-06', prodLineA: 40877, prodLineB: 36675, upphLineA: 0.94, upphLineB: 0.90 },
-    { month: '2026-07', prodLineA: 74, prodLineB: 55434, upphLineA: 0.21, upphLineB: 1.22 },
-    { month: '2026-08', prodLineA: 40339, prodLineB: 50071, upphLineA: 0.93, upphLineB: 1.07 },
-    { month: '2026-09', prodLineA: 58976, prodLineB: 42803, upphLineA: 0.96, upphLineB: 1.07 },
-  ],
+  monthlyData: [],
   lines: [
     {
       id: 'line-a',
       plant: 'HTC Ref(泰国冰箱)',
       prodLine: 'Line A',
-      totalOnTheJobOverride: 129,
-      totalAttendanceOverride: 119,
+      totalOnTheJobOverride: null,
+      totalAttendanceOverride: null,
       totalTargetUpphOverride: 1.22,
-      totalActUpphOverride: 0.96,
+      totalActUpphOverride: null,
       onTheJob: {
         1: 138, 2: 134, 3: 136, 4: 137, 5: 133,
         7: 131, 8: 133, 9: 133, 10: 133, 11: 131,
         14: 125, 15: 130, 16: 130, 17: 125, 18: 125, 19: 125,
-        20: null,
         21: 117, 22: 125, 23: 125, 24: 125, 25: 125,
+        26: 125, 27: 125, 28: 125, 29: 125,
       },
       attendance: {
         1: 122, 2: 118, 3: 123, 4: 127, 5: 120,
         7: 122, 8: 122, 9: 124, 10: 123, 11: 121,
         14: 118, 15: 119, 16: 121, 17: 114, 18: 117, 19: 117,
-        20: 11,
         21: 109, 22: 117, 23: 117, 24: 117, 25: 117,
+        26: 117, 27: 117, 28: 117, 29: 117,
       },
       targetUpph: {
         1: 1.22, 2: 1.22, 3: 1.22, 4: 1.22, 5: 1.22,
         7: 1.22, 8: 1.22, 9: 1.22, 10: 1.22, 11: 1.22,
         14: 1.22, 15: 1.22, 16: 1.22, 17: 1.22, 18: 1.22, 19: 1.22,
-        20: 1.22,
         21: 1.22, 22: 1.22, 23: 1.22, 24: 1.22, 25: 1.22,
+        26: 1.22, 27: 1.22, 28: 1.22, 29: 1.22,
       },
-      actUpph: {
-        1: 0.88, 2: 0.97, 3: 0.92, 4: 1.02, 5: 1.11,
-        7: 1.04, 8: 1.14, 9: 1.06, 10: 1.02, 11: 1.06,
-        14: 1.20, 15: 0.78, 16: 0.70, 17: 1.20, 18: 0.62, 19: 1.20,
-        20: 1.01,
-        21: 1.53, 22: 0.75, 23: 1.31, 24: 1.22, 25: 1.32,
-      },
+      actUpph: {},
     },
     {
       id: 'line-b',
       plant: 'HTC Ref(泰国冰箱)',
       prodLine: 'Line B',
-      totalOnTheJobOverride: 97,
-      totalAttendanceOverride: 93,
+      totalOnTheJobOverride: null,
+      totalAttendanceOverride: null,
       totalTargetUpphOverride: 0.96,
-      totalActUpphOverride: 1.07,
+      totalActUpphOverride: null,
       onTheJob: {
         1: 98, 2: 98, 3: 97, 4: 98, 5: 98,
         7: 98, 8: 98, 9: 98, 10: 98, 11: 96,
         14: 98, 15: 98, 16: 98, 17: 98, 18: 98, 19: 96,
-        20: null,
         21: 96, 22: 96, 23: 96, 24: 96, 25: 96,
+        26: 96, 27: 96, 28: 96,
       },
       attendance: {
         1: 88, 2: 88, 3: 89, 4: 92, 5: 90,
         7: 93, 8: 95, 9: 94, 10: 94, 11: 93,
         14: 96, 15: 96, 16: 95, 17: 95, 18: 95, 19: 92,
-        20: 16,
         21: 94, 22: 92, 23: 92, 24: 92, 25: 92,
+        26: 92, 27: 92, 28: 92,
       },
       targetUpph: {
         1: 0.96, 2: 0.96, 3: 0.96, 4: 0.96, 5: 0.96,
         7: 0.96, 8: 0.96, 9: 0.96, 10: 0.96, 11: 0.96,
         14: 0.96, 15: 0.96, 16: 0.96, 17: 0.96, 18: 0.96, 19: 0.96,
-        20: 0.96,
         21: 0.96, 22: 0.96, 23: 0.96, 24: 0.96, 25: 0.96,
+        26: 0.96, 27: 0.96, 28: 0.96,
       },
-      actUpph: {
-        1: 0.97, 2: 1.00, 3: 1.00, 4: 1.02, 5: 1.03,
-        7: 1.00, 8: 1.03, 9: 1.04, 10: 1.04, 11: 1.05,
-        14: 1.03, 15: 1.03, 16: 1.03, 17: 1.04, 18: 0.73, 19: 1.07,
-        20: 0.85,
-        21: 1.05, 22: 1.08, 23: 1.08, 24: 1.09, 25: 1.12,
-      },
+      actUpph: {},
     },
   ],
 };
+
+export const INITIAL_UPPH_SHEET_DATA: UpphSheetData = syncUpphSheetWithDailyOec(
+  BASE_SEP_UPPH_SHEET_DATA,
+  INITIAL_PERIOD_DATA,
+  INITIAL_MONTHLY_EFFICIENCY,
+  '2026-09'
+);
 
 export const INITIAL_LINE_IDLE_SHEET_DATA: LineIdleSheetData = {
   plant: 'HTC Ref(泰国冰箱)',
@@ -1779,7 +1769,7 @@ export const INITIAL_LINE_IDLE_SHEET_DATA: LineIdleSheetData = {
   ],
 };
 
-export const INITIAL_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
+const BASE_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
   {
     id: 'sp-2026-01',
     period: '2026-01',
@@ -2056,4 +2046,12 @@ export const INITIAL_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
     notes: 'ข้อมูลล่าสุด พ.ย. 2026 (วันที่ 2-15) ยอดผลิตรวม 69,649 ตัว, UPH โรงงาน 134 (Line A 164)',
   },
 ];
+
+export const INITIAL_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] =
+  syncSummaryPerformanceWithOecAndUpph(
+    BASE_SUMMARY_PERFORMANCE_DATA,
+    INITIAL_PERIOD_DATA,
+    INITIAL_MONTHLY_EFFICIENCY,
+    INITIAL_UPPH_SHEET_DATA
+  );
 

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   UpphSheetData,
   UpphLineData,
   UpphMonthlyItem,
   LineOECData,
+  DayColumn,
+  PeriodStorageState,
+  MonthlyEfficiencyRow,
 } from '../types/oec';
 import {
   Save,
@@ -19,15 +22,28 @@ import {
   Calendar,
   Sparkles,
   RotateCcw,
+  Calculator,
+  TrendingUp,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAppPreferences } from '../contexts/AppPreferencesContext';
 import { INITIAL_UPPH_SHEET_DATA } from '../data/initialData';
+import {
+  calculateDailyActUpph,
+  calculateLinePeriodUpph,
+  buildUpphMatrixForPeriod,
+  syncUpphSheetWithDailyOec,
+  UPPH_DEFAULT_TARGETS,
+} from '../utils/upphCalculator';
 
 interface UpphOecViewProps {
   data: UpphSheetData;
   onUpdateData: (newData: UpphSheetData) => void;
   dailyOecLines: LineOECData[];
+  dailyOecDays?: DayColumn[];
+  periodData?: PeriodStorageState;
+  monthlyEfficiency?: MonthlyEfficiencyRow[];
+  activePeriodKey?: string;
   onSaveOnWeb?: (customTitle?: string) => void;
   hasUnsavedChanges?: boolean;
   isSyncing?: boolean;
@@ -40,6 +56,10 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
   data,
   onUpdateData,
   dailyOecLines,
+  dailyOecDays,
+  periodData,
+  monthlyEfficiency = [],
+  activePeriodKey,
   onSaveOnWeb,
   hasUnsavedChanges = false,
   isSyncing = false,
@@ -48,8 +68,34 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
 
   // Filter states inside the original UPPH OEC blue header bar
   const [selectedPlant, setSelectedPlant] = useState<string>('HTC Ref(泰国冰箱)');
-  const [selectedMonthLabel, setSelectedMonthLabel] = useState<string>('9月');
   const [selectedProdLine, setSelectedProdLine] = useState<string>('All');
+
+  const selectedMonthKey = data.activeMonth || '2026-09';
+  const selectedMonthNum = parseInt(selectedMonthKey.split('-')[1] || '9', 10);
+  const selectedMonthLabel = `${selectedMonthNum}月`;
+
+  // Resolve full Daily OEC periodData combining live active period
+  const resolvedPeriodData = useMemo<PeriodStorageState>(() => {
+    const merged: PeriodStorageState = { ...(periodData || {}) };
+    if (activePeriodKey && dailyOecLines?.length > 0) {
+      merged[activePeriodKey] = {
+        lines: dailyOecLines,
+        days:
+          dailyOecDays && dailyOecDays.length > 0
+            ? dailyOecDays
+            : merged[activePeriodKey]?.days || data.days,
+        updatedAt: merged[activePeriodKey]?.updatedAt,
+      };
+    }
+    return merged;
+  }, [periodData, activePeriodKey, dailyOecLines, dailyOecDays, data.days]);
+
+  const monthOecEntry = resolvedPeriodData[selectedMonthKey];
+  const monthOecLines = useMemo<LineOECData[]>(() => {
+    if (monthOecEntry?.lines?.length) return monthOecEntry.lines;
+    if (selectedMonthKey === activePeriodKey) return dailyOecLines;
+    return [];
+  }, [monthOecEntry, selectedMonthKey, activePeriodKey, dailyOecLines]);
 
   // View layout mode: 'original-split' (Left Charts + Right 2 Tables like original image) or 'expanded' (Full width)
   const [layoutMode, setLayoutMode] = useState<'original-split' | 'expanded'>('original-split');
@@ -58,7 +104,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
   const [showMonthlyEditor, setShowMonthlyEditor] = useState<boolean>(false);
   const [showQuickEntry, setShowQuickEntry] = useState<boolean>(false);
   const [showAddDayBar, setShowAddDayBar] = useState<boolean>(false);
-  const [autoRecalcUpphOnAttendanceChange, setAutoRecalcUpphOnAttendanceChange] = useState<boolean>(false);
+  const [autoRecalcUpphOnAttendanceChange, setAutoRecalcUpphOnAttendanceChange] = useState<boolean>(true);
 
   // Active cell editing state for the 2 right-hand matrices
   const [editingCell, setEditingCell] = useState<{
@@ -109,58 +155,53 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
     return true;
   });
 
+  const findMatchingOecLine = (line: UpphLineData) =>
+    monthOecLines.find(
+      l => l.id === line.id || l.prodLine.toLowerCase() === line.prodLine.toLowerCase()
+    );
+
+  // Selected Month Per-Line Summary Statistics calculated straight from Daily OEC
+  const lineSummaries = useMemo(() => {
+    const lineA = data.lines.find(l => l.prodLine.toLowerCase().includes('a')) || data.lines[0];
+    const lineB = data.lines.find(l => l.prodLine.toLowerCase().includes('b')) || data.lines[1];
+
+    const sumA = lineA
+      ? calculateLinePeriodUpph(data.days, findMatchingOecLine(lineA), lineA)
+      : null;
+    const sumB = lineB
+      ? calculateLinePeriodUpph(data.days, findMatchingOecLine(lineB), lineB)
+      : null;
+
+    const totalAct = (sumA?.totalAct || 0) + (sumB?.totalAct || 0);
+    const totalWorkHours = (sumA?.totalWorkHours || 0) + (sumB?.totalWorkHours || 0);
+    const totalManHours = (sumA?.totalManHours || 0) + (sumB?.totalManHours || 0);
+    const avgAttendance = (sumA?.avgAttendance || 0) + (sumB?.avgAttendance || 0);
+    const factoryUph = totalWorkHours > 0 ? Math.round(totalAct / totalWorkHours) : 0;
+    const factoryUpph =
+      totalManHours > 0
+        ? Number((totalAct / totalManHours).toFixed(2))
+        : totalWorkHours > 0 && avgAttendance > 0
+        ? Number((totalAct / (totalWorkHours * avgAttendance)).toFixed(2))
+        : 0;
+
+    return { sumA, sumB, totalAct, totalWorkHours, totalManHours, avgAttendance, factoryUph, factoryUpph };
+  }, [data.days, data.lines, monthOecLines]);
+
   // Helper to compute Total On-the-job for a line
-  const getLineTotalOnTheJob = (line: UpphLineData): number => {
-    if (line.totalOnTheJobOverride !== undefined && line.totalOnTheJobOverride !== null) {
-      return line.totalOnTheJobOverride;
-    }
-    const vals = data.days
-      .map(d => line.onTheJob[d.day])
-      .filter((v): v is number => v !== null && v !== undefined && !isNaN(Number(v)));
-    if (vals.length === 0) return 0;
-    return Math.round(vals.reduce((a, b) => a + Number(b), 0) / vals.length);
-  };
+  const getLineTotalOnTheJob = (line: UpphLineData): number =>
+    calculateLinePeriodUpph(data.days, findMatchingOecLine(line), line).avgOnTheJob;
 
   // Helper to compute Total Attendance for a line
-  const getLineTotalAttendance = (line: UpphLineData): number => {
-    if (line.totalAttendanceOverride !== undefined && line.totalAttendanceOverride !== null) {
-      return line.totalAttendanceOverride;
-    }
-    // Average across regular working days where onTheJob is present (or all days if none)
-    const regularDays = data.days.filter(
-      d => line.onTheJob[d.day] !== null && line.onTheJob[d.day] !== undefined
-    );
-    const targetDays = regularDays.length > 0 ? regularDays : data.days;
-    const vals = targetDays
-      .map(d => line.attendance[d.day])
-      .filter((v): v is number => v !== null && v !== undefined && !isNaN(Number(v)));
-    if (vals.length === 0) return 0;
-    return Math.round(vals.reduce((a, b) => a + Number(b), 0) / vals.length);
-  };
+  const getLineTotalAttendance = (line: UpphLineData): number =>
+    calculateLinePeriodUpph(data.days, findMatchingOecLine(line), line).avgAttendance;
 
   // Helper to compute Total Target UPPH for a line
-  const getLineTotalTargetUpph = (line: UpphLineData): number => {
-    if (line.totalTargetUpphOverride !== undefined && line.totalTargetUpphOverride !== null) {
-      return line.totalTargetUpphOverride;
-    }
-    const vals = data.days
-      .map(d => line.targetUpph[d.day])
-      .filter((v): v is number => v !== null && v !== undefined && !isNaN(Number(v)));
-    if (vals.length === 0) return 0;
-    return Number((vals.reduce((a, b) => a + Number(b), 0) / vals.length).toFixed(2));
-  };
+  const getLineTotalTargetUpph = (line: UpphLineData): number =>
+    calculateLinePeriodUpph(data.days, findMatchingOecLine(line), line).totalTargetUpph;
 
-  // Helper to compute Total Act UPPH for a line
-  const getLineTotalActUpph = (line: UpphLineData): number => {
-    if (line.totalActUpphOverride !== undefined && line.totalActUpphOverride !== null) {
-      return line.totalActUpphOverride;
-    }
-    const vals = data.days
-      .map(d => line.actUpph[d.day])
-      .filter((v): v is number => v !== null && v !== undefined && !isNaN(Number(v)));
-    if (vals.length === 0) return 0;
-    return Number((vals.reduce((a, b) => a + Number(b), 0) / vals.length).toFixed(2));
-  };
+  // Helper to compute Total Act UPPH for a line from Daily OEC
+  const getLineTotalActUpph = (line: UpphLineData): number =>
+    calculateLinePeriodUpph(data.days, findMatchingOecLine(line), line).totalActUpph;
 
   // Start editing a cell
   const handleStartEdit = (
@@ -175,6 +216,77 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       day,
       val: currentVal !== null && currentVal !== undefined ? String(currentVal) : '',
     });
+  };
+
+  // Switch UPPH Month view (1月..12月 -> '2026-01'..'2026-12') and align matrix with Daily OEC
+  const handleSelectMonth = (monthKey: string) => {
+    const updatedMatrices = {
+      ...(data.periodMatrices || {}),
+      [selectedMonthKey]: {
+        days: data.days,
+        lines: data.lines,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    const oecEntry = resolvedPeriodData[monthKey];
+    let targetMatrix = updatedMatrices[monthKey];
+    if (oecEntry?.lines?.length && oecEntry?.days?.length) {
+      targetMatrix = buildUpphMatrixForPeriod(
+        monthKey,
+        oecEntry.days,
+        oecEntry.lines,
+        targetMatrix
+      );
+      updatedMatrices[monthKey] = targetMatrix;
+    }
+
+    const baseSheet: UpphSheetData = {
+      ...data,
+      activeMonth: monthKey,
+      days: targetMatrix?.days || data.days,
+      lines: targetMatrix?.lines || data.lines,
+      periodMatrices: updatedMatrices,
+    };
+
+    const nextSheet = syncUpphSheetWithDailyOec(
+      baseSheet,
+      resolvedPeriodData,
+      monthlyEfficiency,
+      monthKey
+    );
+
+    if (nextSheet.days.length > 0) {
+      setQuickDay(nextSheet.days[nextSheet.days.length - 1].day);
+    }
+    onUpdateData(nextSheet);
+  };
+
+  // Helper to update selected month's matrix & re-sync monthly charts from Daily OEC
+  const commitLinesAndSyncMonthly = (updatedLines: UpphLineData[], nextDays = data.days) => {
+    const updatedMatrices = {
+      ...(data.periodMatrices || {}),
+      [selectedMonthKey]: {
+        days: nextDays,
+        lines: updatedLines,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    const nextSheet = syncUpphSheetWithDailyOec(
+      {
+        ...data,
+        activeMonth: selectedMonthKey,
+        days: nextDays,
+        lines: updatedLines,
+        periodMatrices: updatedMatrices,
+      },
+      resolvedPeriodData,
+      monthlyEfficiency,
+      selectedMonthKey
+    );
+
+    onUpdateData(nextSheet);
   };
 
   // Commit cell edit
@@ -208,18 +320,19 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       if (category === 'onTheJob') nextLine.totalOnTheJobOverride = null;
       if (category === 'attendance') {
         nextLine.totalAttendanceOverride = null;
-        // Optional auto-recalc of Act UPPH from Daily OEC Act / (WorkTime * Attendance)
+        nextLine.totalActUpphOverride = null;
+        // Auto-recalc Act UPPH from Daily OEC Act / (WorkTime * Attendance)
         if (autoRecalcUpphOnAttendanceChange && validNum && validNum > 0) {
-          const matchingOec = dailyOecLines.find(
-            l => l.id === line.id || l.prodLine === line.prodLine
+          const matchingOec = findMatchingOecLine(line);
+          const computed = calculateDailyActUpph(
+            matchingOec?.act[day],
+            matchingOec?.workTime[day],
+            validNum
           );
-          const actProd = matchingOec?.act[day];
-          const workHrs = matchingOec?.workTime[day];
-          if (actProd && workHrs && workHrs > 0) {
-            const computedUpph = Number((actProd / (workHrs * validNum)).toFixed(2));
+          if (computed !== null) {
             nextLine.actUpph = {
               ...nextLine.actUpph,
-              [day]: computedUpph,
+              [day]: computed,
             };
           }
         }
@@ -230,24 +343,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       return nextLine;
     });
 
-    // Also keep the latest month (2026-09) in monthlyData synced if Total Act UPPH changed
-    const nextMonthly = data.monthlyData.map((m, idx) => {
-      if (idx !== data.monthlyData.length - 1) return m;
-      const lineA = updatedLines.find(l => l.prodLine === 'Line A') || updatedLines[0];
-      const lineB = updatedLines.find(l => l.prodLine === 'Line B') || updatedLines[1];
-      return {
-        ...m,
-        upphLineA: lineA ? getLineTotalActUpph(lineA) : m.upphLineA,
-        upphLineB: lineB ? getLineTotalActUpph(lineB) : m.upphLineB,
-      };
-    });
-
-    onUpdateData({
-      ...data,
-      lines: updatedLines,
-      monthlyData: nextMonthly,
-      updatedAt: new Date().toISOString(),
-    });
+    commitLinesAndSyncMonthly(updatedLines);
     setEditingCell(null);
   };
 
@@ -269,8 +365,21 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
         nextLine.totalOnTheJobOverride = null;
       }
       if (quickAttendance.trim() !== '') {
-        nextLine.attendance = { ...nextLine.attendance, [quickDay]: Number(quickAttendance) };
+        const attNum = Number(quickAttendance);
+        nextLine.attendance = { ...nextLine.attendance, [quickDay]: attNum };
         nextLine.totalAttendanceOverride = null;
+        if (autoRecalcUpphOnAttendanceChange && attNum > 0 && quickActUpph.trim() === '') {
+          const matchingOec = findMatchingOecLine(line);
+          const computed = calculateDailyActUpph(
+            matchingOec?.act[quickDay],
+            matchingOec?.workTime[quickDay],
+            attNum
+          );
+          if (computed !== null) {
+            nextLine.actUpph = { ...nextLine.actUpph, [quickDay]: computed };
+            nextLine.totalActUpphOverride = null;
+          }
+        }
       }
       if (quickTargetUpph.trim() !== '') {
         nextLine.targetUpph = { ...nextLine.targetUpph, [quickDay]: Number(quickTargetUpph) };
@@ -283,11 +392,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       return nextLine;
     });
 
-    onUpdateData({
-      ...data,
-      lines: updatedLines,
-      updatedAt: new Date().toISOString(),
-    });
+    commitLinesAndSyncMonthly(updatedLines);
 
     setQuickOnTheJob('');
     setQuickAttendance('');
@@ -316,52 +421,18 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
         totalTargetUpphOverride: targetVal,
       };
     });
-    onUpdateData({
-      ...data,
-      lines: updatedLines,
-      updatedAt: new Date().toISOString(),
-    });
+    commitLinesAndSyncMonthly(updatedLines);
   };
 
-  // Sync / Calculate Act UPPH from Sheet 1 (Daily OEC: Act / (WorkTime * Attendance))
+  // Sync / Recalculate Act UPPH for ALL months (2026-01..2026-11) & current matrix directly from Daily OEC
   const handleSyncActUpphFromDailyOec = () => {
-    const updatedLines = data.lines.map(line => {
-      const matchingOec = dailyOecLines.find(
-        l => l.id === line.id || l.prodLine === line.prodLine
-      );
-      if (!matchingOec) return line;
-
-      const nextActUpph = { ...line.actUpph };
-      data.days.forEach(d => {
-        const actProd = matchingOec.act[d.day];
-        const workHrs = matchingOec.workTime[d.day];
-        const att = line.attendance[d.day];
-        if (
-          actProd !== null &&
-          actProd !== undefined &&
-          workHrs !== null &&
-          workHrs !== undefined &&
-          workHrs > 0 &&
-          att !== null &&
-          att !== undefined &&
-          att > 0
-        ) {
-          nextActUpph[d.day] = Number((Number(actProd) / (Number(workHrs) * Number(att))).toFixed(2));
-        }
-      });
-
-      return {
-        ...line,
-        actUpph: nextActUpph,
-        totalActUpphOverride: null,
-      };
-    });
-
-    onUpdateData({
-      ...data,
-      lines: updatedLines,
-      updatedAt: new Date().toISOString(),
-    });
+    const nextSheet = syncUpphSheetWithDailyOec(
+      data,
+      resolvedPeriodData,
+      monthlyEfficiency,
+      selectedMonthKey
+    );
+    onUpdateData(nextSheet);
   };
 
   // Add new Day column to UPPH Sheet
@@ -380,12 +451,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       },
     }));
 
-    onUpdateData({
-      ...data,
-      days: nextDays,
-      lines: nextLines,
-      updatedAt: new Date().toISOString(),
-    });
+    commitLinesAndSyncMonthly(nextLines, nextDays);
     setShowAddDayBar(false);
   };
 
@@ -591,7 +657,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
               <span className="font-semibold text-white/90">Month</span>
               <select
                 value={selectedMonthLabel}
-                onChange={e => setSelectedMonthLabel(e.target.value)}
+                onChange={e => {
+                  const mNum = parseInt(e.target.value.replace('月', ''), 10);
+                  const yearPrefix = selectedMonthKey.split('-')[0] || '2026';
+                  handleSelectMonth(`${yearPrefix}-${String(mNum).padStart(2, '0')}`);
+                }}
                 className="bg-white text-slate-800 font-semibold px-2.5 py-1 rounded border border-white/40 focus:outline-none cursor-pointer min-w-[90px]"
               >
                 {['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'].map(m => (
@@ -734,6 +804,131 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
             )}
           </div>
         </div>
+      </div>
+
+      {/* =====================================================================
+          PER-LINE DAILY OEC -> UPPH SUMMARY CARDS FOR SELECTED MONTH
+         ===================================================================== */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+        {/* Line A Summary Card */}
+        {(() => {
+          const s = lineSummaries.sumA;
+          const upph = s?.totalActUpph || 0;
+          const tgt = s?.totalTargetUpph || UPPH_DEFAULT_TARGETS.lineA;
+          const gap = Number((upph - tgt).toFixed(2));
+          return (
+            <div className="bg-white rounded-md border border-slate-200 px-3.5 py-2.5 shadow-2xs flex items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#00b0f0]" />
+                  <span className="text-xs font-extrabold text-slate-800">
+                    Line A ({selectedMonthKey})
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 space-x-2">
+                  <span>Act: <strong className="text-slate-800">{(s?.totalAct || 0).toLocaleString()}</strong></span>
+                  <span>·</span>
+                  <span>Hrs: <strong className="text-slate-800">{s?.totalWorkHours || 0}h</strong></span>
+                  <span>·</span>
+                  <span>UPH: <strong className="text-[#0091da]">{s?.uph || 0}</strong></span>
+                  <span>·</span>
+                  <span>Att: <strong className="text-slate-800">{s?.avgAttendance || 0}</strong></span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-semibold uppercase text-slate-400">
+                  {t('UPPH จริง / เป้า', 'Act / Target UPPH', '实际 / 目标 UPPH')}
+                </div>
+                <div className="flex items-baseline justify-end gap-1.5">
+                  <span className="text-xl font-black text-[#0091da] tabular-nums">{upph.toFixed(2)}</span>
+                  <span className="text-xs font-semibold text-slate-400">/ {tgt.toFixed(2)}</span>
+                </div>
+                <div className={`text-[10px] font-bold ${gap >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  Gap {gap >= 0 ? `+${gap.toFixed(2)}` : gap.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Line B Summary Card */}
+        {(() => {
+          const s = lineSummaries.sumB;
+          const upph = s?.totalActUpph || 0;
+          const tgt = s?.totalTargetUpph || UPPH_DEFAULT_TARGETS.lineB;
+          const gap = Number((upph - tgt).toFixed(2));
+          return (
+            <div className="bg-white rounded-md border border-slate-200 px-3.5 py-2.5 shadow-2xs flex items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#0070c0]" />
+                  <span className="text-xs font-extrabold text-slate-800">
+                    Line B ({selectedMonthKey})
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-1 space-x-2">
+                  <span>Act: <strong className="text-slate-800">{(s?.totalAct || 0).toLocaleString()}</strong></span>
+                  <span>·</span>
+                  <span>Hrs: <strong className="text-slate-800">{s?.totalWorkHours || 0}h</strong></span>
+                  <span>·</span>
+                  <span>UPH: <strong className="text-[#0070c0]">{s?.uph || 0}</strong></span>
+                  <span>·</span>
+                  <span>Att: <strong className="text-slate-800">{s?.avgAttendance || 0}</strong></span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-semibold uppercase text-slate-400">
+                  {t('UPPH จริง / เป้า', 'Act / Target UPPH', '实际 / 目标 UPPH')}
+                </div>
+                <div className="flex items-baseline justify-end gap-1.5">
+                  <span className="text-xl font-black text-[#0070c0] tabular-nums">{upph.toFixed(2)}</span>
+                  <span className="text-xs font-semibold text-slate-400">/ {tgt.toFixed(2)}</span>
+                </div>
+                <div className={`text-[10px] font-bold ${gap >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  Gap {gap >= 0 ? `+${gap.toFixed(2)}` : gap.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Factory Overall Weighted UPPH Card */}
+        {(() => {
+          const upph = lineSummaries.factoryUpph;
+          const tgt = UPPH_DEFAULT_TARGETS.factory;
+          const gap = Number((upph - tgt).toFixed(2));
+          return (
+            <div className="bg-slate-900 text-white rounded-md border border-slate-800 px-3.5 py-2.5 shadow-2xs flex items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Calculator className="w-3.5 h-3.5 text-sky-400" />
+                  <span className="text-xs font-extrabold">
+                    {t('รวมโรงงาน (อิง Daily OEC)', 'Plant Weighted UPPH', '全厂加权 UPPH')} · {selectedMonthKey}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-300 mt-1 space-x-2">
+                  <span>Act: <strong className="text-white">{lineSummaries.totalAct.toLocaleString()}</strong></span>
+                  <span>·</span>
+                  <span>UPH: <strong className="text-sky-300">{lineSummaries.factoryUph}</strong></span>
+                  <span>·</span>
+                  <span>Att: <strong className="text-white">{lineSummaries.avgAttendance}</strong></span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-semibold uppercase text-slate-400">
+                  Act ÷ (Hrs × Att)
+                </div>
+                <div className="flex items-baseline justify-end gap-1.5">
+                  <span className="text-xl font-black text-sky-300 tabular-nums">{upph.toFixed(2)}</span>
+                  <span className="text-xs font-semibold text-slate-400">/ {tgt.toFixed(2)}</span>
+                </div>
+                <div className={`text-[10px] font-bold ${gap >= 0 ? 'text-emerald-400' : 'text-amber-300'}`}>
+                  Gap {gap >= 0 ? `+${gap.toFixed(2)}` : gap.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* =====================================================================
@@ -1103,21 +1298,21 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
             <div className="w-full overflow-x-auto select-none">
               {(() => {
                 const items = data.monthlyData;
-                const svgW = 680;
-                const svgH = 245;
-                const pad = { top: 28, right: 20, bottom: 28, left: 20 };
+                const svgW = 760;
+                const svgH = 248;
+                const pad = { top: 28, right: 16, bottom: 30, left: 16 };
                 const innerW = svgW - pad.left - pad.right;
                 const innerH = svgH - pad.top - pad.bottom;
 
                 const allVals = items.flatMap(m => [m.prodLineA, m.prodLineB]);
-                const maxVal = Math.max(...allVals, 60000) * 1.14;
+                const maxVal = Math.max(...allVals, 60000) * 1.15;
                 const stepW = items.length > 0 ? innerW / items.length : innerW;
-                const barW = Math.min(22, stepW * 0.34);
+                const barW = Math.min(20, stepW * 0.34);
 
                 return (
                   <svg
                     viewBox={`0 0 ${svgW} ${svgH}`}
-                    className="w-full h-auto min-w-[500px]"
+                    className="w-full h-auto min-w-[540px]"
                   >
                     {[0.25, 0.5, 0.75, 1].map((r, i) => (
                       <line
@@ -1133,24 +1328,41 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
 
                     {items.map((m, idx) => {
                       const centerX = pad.left + stepW * idx + stepW / 2;
-                      const hA = Math.max(2, (m.prodLineA / maxVal) * innerH);
-                      const hB = Math.max(2, (m.prodLineB / maxVal) * innerH);
+                      const hA = m.prodLineA > 0 ? Math.max(2, (m.prodLineA / maxVal) * innerH) : 0;
+                      const hB = m.prodLineB > 0 ? Math.max(2, (m.prodLineB / maxVal) * innerH) : 0;
                       const yA = pad.top + innerH - hA;
                       const yB = pad.top + innerH - hB;
+                      const isSelected = m.month === selectedMonthKey;
 
                       const showA = selectedProdLine === 'All' || selectedProdLine === 'Line A';
                       const showB = selectedProdLine === 'All' || selectedProdLine === 'Line B';
-                      const xA = showB ? centerX - barW - 2 : centerX - barW / 2;
-                      const xB = showA ? centerX + 2 : centerX - barW / 2;
+                      const xA = showB ? centerX - barW - 1.5 : centerX - barW / 2;
+                      const xB = showA ? centerX + 1.5 : centerX - barW / 2;
+
+                      const fmtProd = (v: number) =>
+                        items.length > 9 && v >= 10000
+                          ? `${(v / 1000).toFixed(1)}k`
+                          : v.toLocaleString();
 
                       return (
                         <g
                           key={m.month}
                           onMouseEnter={() => setHoveredMonthIdx({ chart: 'prod', idx })}
                           onMouseLeave={() => setHoveredMonthIdx(null)}
-                          onClick={() => setShowMonthlyEditor(true)}
+                          onClick={() => handleSelectMonth(m.month)}
                           className="cursor-pointer"
                         >
+                          {isSelected && (
+                            <rect
+                              x={pad.left + stepW * idx + 2}
+                              y={pad.top - 6}
+                              width={stepW - 4}
+                              height={innerH + 8}
+                              rx="4"
+                              fill="#e0f2fe"
+                              opacity="0.55"
+                            />
+                          )}
                           {showA && (
                             <>
                               <rect
@@ -1163,11 +1375,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                               />
                               <text
                                 x={xA + barW / 2}
-                                y={yA - 5}
+                                y={yA - 4}
                                 textAnchor="middle"
-                                className="text-[9.5px] font-bold fill-slate-800"
+                                className="text-[8.5px] font-bold fill-slate-800"
                               >
-                                {m.prodLineA.toLocaleString()}
+                                {fmtProd(m.prodLineA)}
                               </text>
                             </>
                           )}
@@ -1183,11 +1395,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                               />
                               <text
                                 x={xB + barW / 2}
-                                y={yB - 5}
+                                y={yB - 4}
                                 textAnchor="middle"
-                                className="text-[9.5px] font-bold fill-slate-800"
+                                className="text-[8.5px] font-bold fill-slate-800"
                               >
-                                {m.prodLineB.toLocaleString()}
+                                {fmtProd(m.prodLineB)}
                               </text>
                             </>
                           )}
@@ -1195,7 +1407,9 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                             x={centerX}
                             y={svgH - 8}
                             textAnchor="middle"
-                            className="text-[10.5px] font-semibold fill-slate-700"
+                            className={`text-[9.5px] ${
+                              isSelected ? 'font-black fill-[#0070c0]' : 'font-semibold fill-slate-700'
+                            }`}
                           >
                             {m.month}
                           </text>
@@ -1250,14 +1464,14 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
             <div className="w-full overflow-x-auto select-none">
               {(() => {
                 const items = data.monthlyData;
-                const svgW = 680;
-                const svgH = 245;
-                const pad = { top: 28, right: 32, bottom: 28, left: 32 };
+                const svgW = 760;
+                const svgH = 248;
+                const pad = { top: 28, right: 32, bottom: 30, left: 32 };
                 const innerW = svgW - pad.left - pad.right;
                 const innerH = svgH - pad.top - pad.bottom;
 
                 const allVals = items.flatMap(m => [m.upphLineA, m.upphLineB]);
-                const maxVal = Math.max(...allVals, 1.3) * 1.15;
+                const maxVal = Math.max(...allVals, 1.4) * 1.15;
                 const minVal = 0;
 
                 const getX = (i: number) =>
@@ -1290,7 +1504,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                 return (
                   <svg
                     viewBox={`0 0 ${svgW} ${svgH}`}
-                    className="w-full h-auto min-w-[500px]"
+                    className="w-full h-auto min-w-[540px]"
                   >
                     {[0.25, 0.5, 0.75, 1].map((r, i) => (
                       <line
@@ -1328,12 +1542,13 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                     {/* Nodes & Labels for Line B */}
                     {showB &&
                       ptsB.map((pt, i) => {
+                        const isClose = Math.abs(pt.y - ptsA[i].y) < 16;
                         const isBelowA = pt.y >= ptsA[i].y;
-                        const lblY = isBelowA ? pt.y + 15 : pt.y - 8;
+                        const lblY = isBelowA ? pt.y + (isClose ? 16 : 14) : pt.y - 8;
                         return (
                           <g
                             key={`b-${i}`}
-                            onClick={() => setShowMonthlyEditor(true)}
+                            onClick={() => handleSelectMonth(pt.month)}
                             onMouseEnter={() => setHoveredMonthIdx({ chart: 'upph', idx: i })}
                             onMouseLeave={() => setHoveredMonthIdx(null)}
                             className="cursor-pointer"
@@ -1341,7 +1556,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                             <circle
                               cx={pt.x}
                               cy={pt.y}
-                              r={hoveredMonthIdx?.idx === i ? 5 : 3.5}
+                              r={hoveredMonthIdx?.idx === i || pt.month === selectedMonthKey ? 5 : 3.5}
                               fill="#0070c0"
                               stroke="#fff"
                               strokeWidth="1.5"
@@ -1350,7 +1565,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                               x={pt.x}
                               y={lblY}
                               textAnchor="middle"
-                              className="text-[10px] font-bold fill-slate-800"
+                              className="text-[9.5px] font-bold fill-slate-800"
                             >
                               {pt.val.toFixed(2)}
                             </text>
@@ -1362,11 +1577,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                     {showA &&
                       ptsA.map((pt, i) => {
                         const isAboveB = pt.y < ptsB[i].y;
-                        const lblY = isAboveB ? pt.y - 8 : pt.y + 15;
+                        const lblY = isAboveB ? pt.y - 8 : pt.y + 14;
                         return (
                           <g
                             key={`a-${i}`}
-                            onClick={() => setShowMonthlyEditor(true)}
+                            onClick={() => handleSelectMonth(pt.month)}
                             onMouseEnter={() => setHoveredMonthIdx({ chart: 'upph', idx: i })}
                             onMouseLeave={() => setHoveredMonthIdx(null)}
                             className="cursor-pointer"
@@ -1374,7 +1589,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                             <circle
                               cx={pt.x}
                               cy={pt.y}
-                              r={hoveredMonthIdx?.idx === i ? 5 : 3.5}
+                              r={hoveredMonthIdx?.idx === i || pt.month === selectedMonthKey ? 5 : 3.5}
                               fill="#00b0f0"
                               stroke="#fff"
                               strokeWidth="1.5"
@@ -1383,7 +1598,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                               x={pt.x}
                               y={lblY}
                               textAnchor="middle"
-                              className="text-[10px] font-bold fill-slate-800"
+                              className="text-[9.5px] font-bold fill-slate-800"
                             >
                               {pt.val.toFixed(2)}
                             </text>
@@ -1398,7 +1613,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                         x={getX(i)}
                         y={svgH - 8}
                         textAnchor="middle"
-                        className="text-[10.5px] font-semibold fill-slate-700"
+                        className={`text-[9.5px] ${
+                          m.month === selectedMonthKey
+                            ? 'font-black fill-[#0070c0]'
+                            : 'font-semibold fill-slate-700'
+                        }`}
                       >
                         {m.month}
                       </text>
@@ -1995,6 +2214,150 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
               </table>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* =====================================================================
+          ALL-MONTHS LINE UPPH CALCULATION TABLE (DERIVED FROM DAILY OEC)
+         ===================================================================== */}
+      <div className="bg-white rounded-md border border-slate-300 shadow-xs overflow-hidden">
+        <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-sky-400" />
+            <h3 className="text-xs sm:text-sm font-bold">
+              {t(
+                'ตารางสรุปผลการคำนวณ UPPH แยกรายไลน์ทุกเดือน (อิงข้อมูล Daily OEC: Act ÷ (WorkTime × Attendance))',
+                'Monthly UPPH Calculation Matrix by Production Line (Derived from Daily OEC)',
+                '月度各产线 UPPH 核算汇总表（基于 Daily OEC：实际产量 ÷ (工时 × 出勤)）'
+              )}
+            </h3>
+          </div>
+          <span className="text-[11px] text-sky-300 font-medium">
+            {t(
+              'คลิกแถวเดือนใดก็ได้เพื่อเปิดดูตาราง UPPH รายวันของเดือนนั้นด้านบน',
+              'Click any month row to load its daily UPPH matrix above',
+              '点击任意月份行即可在上方查看该月每日 UPPH 明细表'
+            )}
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
+                <th className="border-r border-slate-200 px-3 py-2 text-center">Month</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-right text-[#0091da]">Line A Act</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line A Hrs</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line A UPH</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line A Att</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center bg-sky-50 text-[#0091da]">Line A UPPH</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-right text-[#0070c0]">Line B Act</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line B Hrs</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line B UPH</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line B Att</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center bg-blue-50 text-[#0070c0]">Line B UPPH</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Total Att</th>
+                <th className="px-2.5 py-2 text-center bg-slate-900 text-white">Plant UPPH</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.monthlyData.map(m => {
+                const oec = resolvedPeriodData[m.month];
+                const eff = monthlyEfficiency.find(e => e.month === m.month);
+                const mat = data.periodMatrices?.[m.month];
+                const oecA = oec?.lines?.find(l => l.prodLine.toLowerCase().includes('a')) || oec?.lines?.[0];
+                const oecB = oec?.lines?.find(l => l.prodLine.toLowerCase().includes('b')) || oec?.lines?.[1];
+                const uA = mat?.lines?.find(l => l.prodLine.toLowerCase().includes('a')) || mat?.lines?.[0];
+                const uB = mat?.lines?.find(l => l.prodLine.toLowerCase().includes('b')) || mat?.lines?.[1];
+
+                const sA = uA && mat ? calculateLinePeriodUpph(mat.days, oecA, uA) : null;
+                const sB = uB && mat ? calculateLinePeriodUpph(mat.days, oecB, uB) : null;
+
+                const aAct = sA ? sA.totalAct : eff?.lineAAct || m.prodLineA;
+                const aHrs = sA ? sA.totalWorkHours : eff?.lineAWorkHours || 0;
+                const aUph = sA ? sA.uph : eff?.lineAUph || (aHrs > 0 ? Math.round(aAct / aHrs) : 0);
+                const aAtt = sA ? sA.avgAttendance : 0;
+
+                const bAct = sB ? sB.totalAct : eff?.lineBAct || m.prodLineB;
+                const bHrs = sB ? sB.totalWorkHours : eff?.lineBWorkHours || 0;
+                const bUph = sB ? sB.uph : eff?.lineBUph || (bHrs > 0 ? Math.round(bAct / bHrs) : 0);
+                const bAtt = sB ? sB.avgAttendance : 0;
+
+                const totAtt = aAtt + bAtt;
+                const totManHrs = (sA?.totalManHours || 0) + (sB?.totalManHours || 0);
+                const plantUpph =
+                  totManHrs > 0
+                    ? Number(((aAct + bAct) / totManHrs).toFixed(2))
+                    : Number(((m.upphLineA + m.upphLineB) / 2).toFixed(2));
+                const isSelected = m.month === selectedMonthKey;
+
+                return (
+                  <tr
+                    key={`summary-${m.month}`}
+                    onClick={() => handleSelectMonth(m.month)}
+                    className={`border-b border-slate-200 cursor-pointer transition-colors ${
+                      isSelected ? 'bg-sky-50 font-semibold' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <td className="border-r border-slate-200 px-3 py-1.5 text-center font-bold text-slate-800">
+                      <span className="inline-flex items-center gap-1.5">
+                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#0070c0]" />}
+                        {m.month}
+                      </span>
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-right tabular-nums">
+                      {aAct.toLocaleString()}
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-600">
+                      {aHrs}
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-semibold text-slate-800">
+                      {aUph}
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-600">
+                      {aAtt || '-'}
+                    </td>
+                    <td
+                      className={`border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-extrabold bg-sky-50/70 ${
+                        m.upphLineA >= UPPH_DEFAULT_TARGETS.lineA ? 'text-emerald-700' : 'text-[#0091da]'
+                      }`}
+                    >
+                      {m.upphLineA.toFixed(2)}
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-right tabular-nums">
+                      {bAct.toLocaleString()}
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-600">
+                      {bHrs}
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-semibold text-slate-800">
+                      {bUph}
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-600">
+                      {bAtt || '-'}
+                    </td>
+                    <td
+                      className={`border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-extrabold bg-blue-50/70 ${
+                        m.upphLineB >= UPPH_DEFAULT_TARGETS.lineB ? 'text-emerald-700' : 'text-[#0070c0]'
+                      }`}
+                    >
+                      {m.upphLineB.toFixed(2)}
+                    </td>
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-semibold text-slate-700">
+                      {totAtt || '-'}
+                    </td>
+                    <td
+                      className={`px-2.5 py-1.5 text-center tabular-nums font-black ${
+                        plantUpph >= UPPH_DEFAULT_TARGETS.factory ? 'text-emerald-700 bg-emerald-50' : 'text-slate-900 bg-slate-50'
+                      }`}
+                    >
+                      {plantUpph.toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

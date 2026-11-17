@@ -25,7 +25,8 @@ import {
   History,
   TrendingUp,
   Languages,
-  Palette
+  Palette,
+  LayoutGrid
 } from 'lucide-react';
 import { OECFilterState, ActiveSheetTab, EditableCustomSheet } from '../types/oec';
 import { THAI_MONTHS } from '../utils/dateHelper';
@@ -141,19 +142,19 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Top-Right Dropdown Filters matching screenshot & Cloud Status */}
           <div className="flex flex-wrap items-center gap-3">
             {/* Language Switcher (TH / EN / ZH) & 5 Color Theme Switcher */}
-            <div className="flex flex-wrap items-center gap-2 bg-slate-100/90 border border-slate-200 rounded-md px-2 py-1">
+            <div className="flex flex-wrap items-center gap-2 bg-slate-100/90 border border-slate-200 rounded-md px-2.5 py-1">
               {/* Language Selector */}
-              <div className="flex items-center gap-1" title={t('เปลี่ยนภาษาบนหน้าเว็บ', 'Switch Web Language', '切换网页语言')}>
-                <Languages className="w-3.5 h-3.5 text-[#0070c0] mr-0.5" />
+              <div className="flex items-center gap-1" title={t('เปลี่ยนภาษาทั้งหมดบนเว็บ (ไทย / จีน / อังกฤษ)', 'Switch Language (Thai / Chinese / English)', '切换全站语言 (泰语 / 中文 / 英语)')}>
+                <Languages className="w-3.5 h-3.5 text-[#0070c0] mr-0.5 shrink-0" />
                 {([
                   { code: 'th' as AppLanguage, label: 'ไทย' },
-                  { code: 'en' as AppLanguage, label: 'EN' },
                   { code: 'zh' as AppLanguage, label: '中文' },
+                  { code: 'en' as AppLanguage, label: 'EN' },
                 ]).map(langItem => (
                   <button
                     key={langItem.code}
                     onClick={() => setLanguage(langItem.code)}
-                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       language === langItem.code
                         ? 'bg-[#0070c0] text-white shadow-2xs'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -468,6 +469,24 @@ export const Header: React.FC<HeaderProps> = ({
                   'Sheet 1: Daily OEC (ตารางหลัก 生产&效率日清)',
                   'Sheet 1: Daily OEC Dashboard & Matrix',
                   'Sheet 1: 每日生产&效率日清主表 (Daily OEC)'
+                )}
+              </span>
+            </button>
+
+            <button
+              onClick={() => onTabChange('summary-onepage')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'summary-onepage'
+                  ? 'border-[#0070c0] text-[#0070c0] bg-blue-50/70 shadow-xs'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4 text-[#0070c0]" />
+              <span>
+                {t(
+                  'Summary Onepage Dashboard (สรุปหน้าเดียว)',
+                  'Summary Onepage Dashboard',
+                  '一页式汇总看板 (Summary Onepage)'
                 )}
               </span>
             </button>

@@ -4,20 +4,23 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  X, 
-  Calendar, 
-  Plus, 
-  Check, 
-  Layers, 
-  ChevronRight, 
-  Clock, 
-  Sparkles, 
-  Info,
-  CalendarDays
+import {
+  X,
+  Calendar,
+  Plus,
+  Check,
+  Clock,
+  Sparkles,
+  CalendarDays,
 } from 'lucide-react';
 import { DayColumn, OECFilterState } from '../types/oec';
-import { THAI_MONTHS, generateMonthDayColumns, getWeekdayName } from '../utils/dateHelper';
+import {
+  THAI_MONTHS,
+  formatPeriodLabel,
+  generateMonthDayColumns,
+  getWeekdayName,
+} from '../utils/dateHelper';
+import { useAppPreferences } from '../contexts/AppPreferencesContext';
 
 interface DatePeriodModalProps {
   isOpen: boolean;
@@ -38,8 +41,10 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
   onSetDays,
   onAddDay,
 }) => {
+  const { language, t } = useAppPreferences();
   const currentYear = filters.year;
-  const currentMonthNum = filters.month === 'All' ? 9 : parseInt(filters.month.split('-')[1] || '9', 10);
+  const currentMonthNum =
+    filters.month === 'All' ? 9 : parseInt(filters.month.split('-')[1] || '9', 10);
 
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number>(currentMonthNum);
@@ -50,37 +55,47 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
 
   if (!isOpen) return null;
 
+  const selectedMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+  const selectedPeriodLabel = formatPeriodLabel(selectedYear, selectedMonthKey, language);
+
   const showTempNotice = (msg: string) => {
     setNotice(msg);
     setTimeout(() => setNotice(null), 3500);
   };
 
-  // Switch to selected Year and Month
   const handleApplyPeriod = () => {
-    const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     onFilterChange({
       ...filters,
       year: selectedYear,
-      month: monthKey,
+      month: selectedMonthKey,
     });
-    showTempNotice(`สลับไปยังช่วงเวลา: ${THAI_MONTHS[selectedMonth - 1]?.label} ปี ${selectedYear} เรียบร้อยแล้ว`);
+    showTempNotice(
+      t(
+        `สลับไปยังช่วงเวลา: ${selectedPeriodLabel} เรียบร้อยแล้ว`,
+        `Switched period to: ${selectedPeriodLabel}`,
+        `已切换至周期: ${selectedPeriodLabel}`
+      )
+    );
   };
 
-  // Auto-generate full month day columns (1 to 28/29/30/31)
   const handleGenerateFullMonth = () => {
     const newDays = generateMonthDayColumns(selectedYear, selectedMonth);
-    const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
-    
+
     onFilterChange({
       ...filters,
       year: selectedYear,
-      month: monthKey,
+      month: selectedMonthKey,
     });
     onSetDays(newDays);
-    showTempNotice(`สร้างคอลัมน์วันทำการทั้งเดือน (${newDays.length} วัน) เรียบร้อยแล้ว!`);
+    showTempNotice(
+      t(
+        `สร้างคอลัมน์วันทำการทั้งเดือน (${newDays.length} วัน) เรียบร้อยแล้ว!`,
+        `Generated full month calendar (${newDays.length} days)!`,
+        `已生成整月工作日历列 (${newDays.length} 天)！`
+      )
+    );
   };
 
-  // Add specific single date from calendar picker
   const handleAddCalendarDate = () => {
     if (!customDate) return;
     const parts = customDate.split('-');
@@ -90,12 +105,18 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
 
     const weekday = getWeekdayName(y, m, d);
     onAddDay(d, weekday);
-    showTempNotice(`เพิ่มวันที่ ${d} (${weekday}) เข้าสู่ตารางเรียบร้อยแล้ว`);
+    showTempNotice(
+      t(
+        `เพิ่มวันที่ ${d} (${weekday}) เข้าสู่ตารางเรียบร้อยแล้ว`,
+        `Added day ${d} (${weekday}) to the matrix`,
+        `已将 ${d}日 (${weekday}) 添加至表格`
+      )
+    );
   };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div 
+      <div
         className="bg-white rounded-xl shadow-2xl max-w-xl w-full border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
@@ -106,9 +127,19 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
               <Calendar className="w-5 h-5 text-sky-200" />
             </div>
             <div>
-              <h3 className="font-bold text-lg text-white">จัดการวัน เดือน ปี สำหรับใส่ข้อมูล</h3>
+              <h3 className="font-bold text-lg text-white">
+                {t(
+                  'จัดการวัน เดือน ปี สำหรับใส่ข้อมูล',
+                  'Date & Period Manager',
+                  '日期 / 月份 / 年份周期管理'
+                )}
+              </h3>
               <p className="text-xs text-sky-100">
-                กำหนดช่วงเวลาและวันทำการสำหรับกรอกข้อมูลการผลิตและประสิทธิภาพ
+                {t(
+                  'กำหนดช่วงเวลาและวันทำการสำหรับกรอกข้อมูลการผลิตและประสิทธิภาพ',
+                  'Configure reporting periods and working days for production & efficiency entry',
+                  '设置生产与效率数据录入周期及工作日历列'
+                )}
               </p>
             </div>
           </div>
@@ -130,16 +161,24 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
 
         {/* Body */}
         <div className="p-6 space-y-6">
-          {/* Section 1: Select Year and Month */}
+          {/* Section 1 */}
           <div className="space-y-3">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <CalendarDays className="w-4 h-4 text-[#0070c0]" />
-              <span>1. เลือกปี และ เดือน ที่ต้องการบันทึกข้อมูล</span>
+              <span>
+                {t(
+                  '1. เลือกปี และ เดือน ที่ต้องการบันทึกข้อมูล',
+                  '1. Select Target Year & Month',
+                  '1. 选择目标年份与月份'
+                )}
+              </span>
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">ปี (Year)</label>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  {t('ปี (Year)', 'Year', '年份 (Year)')}
+                </label>
                 <select
                   value={selectedYear}
                   onChange={e => setSelectedYear(Number(e.target.value))}
@@ -147,14 +186,16 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
                 >
                   <option value={2024}>2024</option>
                   <option value={2025}>2025</option>
-                  <option value={2026}>2026 (ปีปัจจุบันในรูป)</option>
+                  <option value={2026}>2026</option>
                   <option value={2027}>2027</option>
                   <option value={2028}>2028</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">เดือน (Month)</label>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  {t('เดือน (Month)', 'Month', '月份 (Month)')}
+                </label>
                 <select
                   value={selectedMonth}
                   onChange={e => setSelectedMonth(Number(e.target.value))}
@@ -162,7 +203,7 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
                 >
                   {THAI_MONTHS.map((m, idx) => (
                     <option key={m.value} value={idx + 1}>
-                      {m.label}
+                      {formatPeriodLabel(selectedYear, `${selectedYear}-${m.value}`, language)}
                     </option>
                   ))}
                 </select>
@@ -171,13 +212,14 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
 
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-slate-500">
-                ช่วงเวลาที่เลือก: <strong className="text-slate-800">{THAI_MONTHS[selectedMonth - 1]?.label} {selectedYear}</strong>
+                {t('ช่วงเวลาที่เลือก:', 'Selected Period:', '所选周期:')}{' '}
+                <strong className="text-slate-800">{selectedPeriodLabel}</strong>
               </span>
               <button
                 onClick={handleApplyPeriod}
                 className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#0070c0] font-semibold text-xs rounded-lg border border-blue-200 transition-colors cursor-pointer"
               >
-                สลับไปยังช่วงเวลานี้
+                {t('สลับไปยังช่วงเวลานี้', 'Switch to Period', '切换至此周期')}
               </button>
             </div>
           </div>
@@ -185,10 +227,20 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
           <div className="border-t border-slate-200 pt-5 space-y-3">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>2. สร้างคอลัมน์วันทำการทั้งเดือนอัตโนมัติ (1-30/31 วัน)</span>
+              <span>
+                {t(
+                  '2. สร้างคอลัมน์วันทำการทั้งเดือนอัตโนมัติ (1-30/31 วัน)',
+                  '2. Auto-Generate Full Month Columns (1–30/31 Days)',
+                  '2. 自动生成整月工作日历列 (1–30/31 天)'
+                )}
+              </span>
             </label>
             <p className="text-xs text-slate-500">
-              ระบบจะคำนวณวันในสัปดาห์ (จันทร์, อังคาร, พุธ...) ให้ตรงตามปฏิทินจริงของเดือนและปีที่เลือกทันที
+              {t(
+                'ระบบจะคำนวณวันในสัปดาห์ (จันทร์, อังคาร, พุธ...) ให้ตรงตามปฏิทินจริงของเดือนและปีที่เลือกทันที',
+                'Automatically maps real calendar weekdays (MON, TUE, WEN...) for the selected month and year.',
+                '系统将根据所选年月自动匹配真实星期（MON, TUE, WEN...）。'
+              )}
             </p>
 
             <button
@@ -196,14 +248,26 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
               className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs rounded-lg shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
-              <span>สร้างตารางวันทำการทั้งเดือนสำหรับ {THAI_MONTHS[selectedMonth - 1]?.label} {selectedYear}</span>
+              <span>
+                {t(
+                  `สร้างตารางวันทำการทั้งเดือนสำหรับ ${selectedPeriodLabel}`,
+                  `Generate Full Month Columns for ${selectedPeriodLabel}`,
+                  `生成 ${selectedPeriodLabel} 整月工作日表`
+                )}
+              </span>
             </button>
           </div>
 
           <div className="border-t border-slate-200 pt-5 space-y-3">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
               <Plus className="w-4 h-4 text-blue-600" />
-              <span>3. เพิ่มวันเฉพาะจากปฏิทิน (Custom Date Picker)</span>
+              <span>
+                {t(
+                  '3. เพิ่มวันเฉพาะจากปฏิทิน (Custom Date Picker)',
+                  '3. Add Specific Day from Calendar',
+                  '3. 从日历添加指定日期列'
+                )}
+              </span>
             </label>
 
             <div className="flex items-center gap-2">
@@ -218,19 +282,25 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
                 className="px-4 py-2 bg-[#0070c0] hover:bg-[#005a9c] text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>เพิ่มวันลงในตาราง</span>
+                <span>{t('เพิ่มวันลงในตาราง', 'Add Day Column', '添加日期列')}</span>
               </button>
             </div>
           </div>
 
           {/* Current Days Status */}
-          <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 text-xs text-slate-600 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Clock className="w-4 h-4 text-slate-400" />
-              <span>คอลัมน์วันทำการที่มีอยู่ในตารางปัจจุบัน:</span>
+              <span>
+                {t(
+                  'คอลัมน์วันทำการในตารางปัจจุบัน:',
+                  'Active day columns in matrix:',
+                  '当前表格工作日历列:'
+                )}
+              </span>
             </div>
-            <span className="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
-              {currentDays.length} วัน ({currentDays.map(d => d.day).join(', ')})
+            <span className="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 truncate">
+              {currentDays.length} {t('วัน', 'days', '天')} ({currentDays.map(d => d.day).join(', ')})
             </span>
           </div>
         </div>
@@ -241,7 +311,7 @@ export const DatePeriodModal: React.FC<DatePeriodModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
           >
-            เสร็จสิ้น
+            {t('เสร็จสิ้น', 'Done', '完成')}
           </button>
         </div>
       </div>

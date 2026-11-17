@@ -2,6 +2,7 @@ export type CategoryType = 'Planning' | 'Act' | 'Gap' | 'Work Time' | 'UPH';
 
 export type ActiveSheetTab =
   | 'daily-oec'
+  | 'summary-onepage'
   | 'upph-oec'
   | 'line-idle'
   | 'summary-performance'
@@ -115,10 +116,18 @@ export interface UpphLineData {
   totalActUpphOverride?: number | null;
 }
 
+export interface UpphPeriodMatrix {
+  days: DayColumn[];
+  lines: UpphLineData[];
+  updatedAt?: string;
+}
+
 export interface UpphSheetData {
   days: DayColumn[];
   lines: UpphLineData[];
   monthlyData: UpphMonthlyItem[];
+  periodMatrices?: Record<string, UpphPeriodMatrix>;
+  activeMonth?: string; // e.g. '2026-09'
   updatedAt?: string;
 }
 
