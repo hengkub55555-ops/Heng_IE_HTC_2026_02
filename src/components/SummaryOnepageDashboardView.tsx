@@ -173,7 +173,7 @@ export const SummaryOnepageDashboardView: React.FC<SummaryOnepageDashboardViewPr
         lineAUpph,
         lineBUpph,
         avgUpph,
-        targetUpph: perf?.targetUpph ?? 1.09,
+        targetUpph: perf?.targetUpph && perf.targetUpph >= 5 ? perf.targetUpph : 16.5,
         attendance: perf?.attendance ?? 182,
         idleOver1MinRate: idle?.over1MinRate ?? perf?.idleOver1MinRate ?? 0,
         idle1To5MinRate: idle?.oneTo5MinRate ?? perf?.idle1To5MinRate ?? 0,
@@ -216,7 +216,7 @@ export const SummaryOnepageDashboardView: React.FC<SummaryOnepageDashboardViewPr
         lineBHrs: 0,
         lineBUph: 0,
         avgUpph: 0,
-        targetUpph: 1.09,
+        targetUpph: 16.5,
         lineAUpph: 0,
         lineBUpph: 0,
         attendance: 0,
@@ -307,7 +307,7 @@ export const SummaryOnepageDashboardView: React.FC<SummaryOnepageDashboardViewPr
       lineBHrs: Number(lineBHrs.toFixed(1)),
       lineBUph,
       avgUpph,
-      targetUpph: targetRows[targetRows.length - 1]?.targetUpph ?? 1.09,
+      targetUpph: targetRows[targetRows.length - 1]?.targetUpph ?? 16.5,
       lineAUpph,
       lineBUpph,
       attendance,
@@ -319,6 +319,24 @@ export const SummaryOnepageDashboardView: React.FC<SummaryOnepageDashboardViewPr
       monthsCount: targetRows.length,
     };
   }, [scope, unifiedMonths]);
+
+  // Always-available YTD Weighted UPH benchmarks for Both Lines Combined & Line A / Line B
+  const ytdUphBenchmarks = useMemo(() => {
+    const aAct = unifiedMonths.reduce((s, r) => s + r.lineAAct, 0);
+    const aHrs = unifiedMonths.reduce((s, r) => s + r.lineAWorkHours, 0);
+    const bAct = unifiedMonths.reduce((s, r) => s + r.lineBAct, 0);
+    const bHrs = unifiedMonths.reduce((s, r) => s + r.lineBWorkHours, 0);
+    const combAct = aAct + bAct;
+    const combHrs = aHrs + bHrs;
+    return {
+      combinedUph: combHrs > 0 ? Math.round(combAct / combHrs) : 0,
+      lineAUph: aHrs > 0 ? Math.round(aAct / aHrs) : 0,
+      lineBUph: bHrs > 0 ? Math.round(bAct / bHrs) : 0,
+      combinedHrs: Number(combHrs.toFixed(0)),
+      lineAHrs: Number(aHrs.toFixed(0)),
+      lineBHrs: Number(bHrs.toFixed(0)),
+    };
+  }, [unifiedMonths]);
 
   // Daily breakdown for the focused month (uses live activeLines/activeDays if matching activePeriodKey)
   const focusDailyStats = useMemo(() => {
@@ -414,8 +432,8 @@ export const SummaryOnepageDashboardView: React.FC<SummaryOnepageDashboardViewPr
       return {
         minV: 0,
         maxV: Number((Math.ceil(maxV * 5) / 5).toFixed(1)),
-        targetVal: 1.09,
-        targetLabel: t('เป้า UPPH: 1.09', 'Target: 1.09', '目标: 1.09'),
+        targetVal: 16.5,
+        targetLabel: t('เป้า UPPH: 16.50', 'Target: 16.50', '目标: 16.50'),
         unit: 'UPPH',
         seriesA: unifiedMonths.map(m => m.lineAUpph),
         seriesB: unifiedMonths.map(m => m.lineBUpph),
@@ -637,22 +655,34 @@ export const SummaryOnepageDashboardView: React.FC<SummaryOnepageDashboardViewPr
                 {overviewStats.avgUph}
               </span>
               <span className="text-xs font-semibold text-slate-500">
-                {t('ตัว/ชม. (เฉลี่ย)', 'Units/Hr (AVG)', '台/小时 (均值)')}
+                {scope === 'YTD'
+                  ? t('ตัว/ชม. (รวม 2 ไลน์ YTD)', 'Units/Hr (Both Lines YTD)', '台/小时 (双线 YTD)')
+                  : t('ตัว/ชม. (รวม 2 ไลน์)', 'Units/Hr (Combined)', '台/小时 (双线合计)')}
               </span>
             </div>
+            {scope !== 'YTD' && (
+              <div className="mt-1 text-[11px] font-semibold text-slate-500 tabular-nums">
+                {t('สะสม YTD:', 'YTD Weighted:', '累计 YTD:')}{' '}
+                <span className="text-[#0070c0] font-bold">{ytdUphBenchmarks.combinedUph}</span>
+                <span className="mx-1 text-slate-300">·</span>
+                <span>A: {ytdUphBenchmarks.lineAUph}</span>
+                <span className="mx-1 text-slate-300">·</span>
+                <span>B: {ytdUphBenchmarks.lineBUph}</span>
+              </div>
+            )}
           </div>
 
           <div className="mt-3 pt-2.5 border-t border-slate-100 grid grid-cols-3 gap-2 text-[11px]">
             <div>
-              <span className="text-slate-400 block">Line A</span>
-              <span className="font-bold text-slate-800 tabular-nums">{overviewStats.lineAUph}</span>
+              <span className="text-slate-400 block">Line A ({overviewStats.lineAHrs.toLocaleString()}h)</span>
+              <span className="font-bold text-slate-800 tabular-nums">{overviewStats.lineAUph} UPH</span>
             </div>
             <div>
-              <span className="text-slate-400 block">Line B</span>
-              <span className="font-bold text-slate-800 tabular-nums">{overviewStats.lineBUph}</span>
+              <span className="text-slate-400 block">Line B ({overviewStats.lineBHrs.toLocaleString()}h)</span>
+              <span className="font-bold text-slate-800 tabular-nums">{overviewStats.lineBUph} UPH</span>
             </div>
             <div className="text-right">
-              <span className="text-slate-400 block">{t('ชม.ทำงาน', 'Work Hrs', '工时')}</span>
+              <span className="text-slate-400 block">{t('ชม.ทำงานรวม', 'Total Hrs', '总工时')}</span>
               <span className="font-bold text-slate-800 tabular-nums">
                 {overviewStats.workHours.toLocaleString()}
               </span>

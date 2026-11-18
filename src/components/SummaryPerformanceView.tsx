@@ -72,7 +72,7 @@ export const SummaryPerformanceView: React.FC<SummaryPerformanceViewProps> = ({
         avgLineAUpph: 0,
         avgLineBUpph: 0,
         avgUpph: 0,
-        targetUpph: 1.09,
+        targetUpph: 16.5,
         avgAttendance: 0,
         totalIdleOver1MinHours: 0,
         avgIdleOver1MinRate: 0,
@@ -89,9 +89,32 @@ export const SummaryPerformanceView: React.FC<SummaryPerformanceViewProps> = ({
     const totalAct = rows.reduce((s, r) => s + Number(r.totalAct || 0), 0);
     const totalWorkHours = rows.reduce((s, r) => s + Number(r.workHours || 0), 0);
 
-    const avgLineAUph = Math.round(rows.reduce((s, r) => s + Number(r.lineAUph || 0), 0) / n);
-    const avgLineBUph = Math.round(rows.reduce((s, r) => s + Number(r.lineBUph || 0), 0) / n);
-    const avgUph = Math.round(rows.reduce((s, r) => s + Number(r.avgUph || 0), 0) / n);
+    // Weighted YTD UPH for Line A, Line B, and Combined 2 Lines from monthlyEfficiency
+    const matchingEff =
+      monthlyEfficiency.length > 0
+        ? monthlyEfficiency.filter(m => rows.some(r => r.period === m.month))
+        : [];
+    const effSource = matchingEff.length > 0 ? matchingEff : monthlyEfficiency;
+
+    const lineAActYtd = effSource.reduce((s, m) => s + Number(m.lineAAct || 0), 0);
+    const lineAHrsYtd = effSource.reduce((s, m) => s + Number(m.lineAWorkHours || 0), 0);
+    const lineBActYtd = effSource.reduce((s, m) => s + Number(m.lineBAct || 0), 0);
+    const lineBHrsYtd = effSource.reduce((s, m) => s + Number(m.lineBWorkHours || 0), 0);
+
+    const avgLineAUph =
+      lineAHrsYtd > 0
+        ? Math.round(lineAActYtd / lineAHrsYtd)
+        : Math.round(rows.reduce((s, r) => s + Number(r.lineAUph || 0), 0) / n);
+    const avgLineBUph =
+      lineBHrsYtd > 0
+        ? Math.round(lineBActYtd / lineBHrsYtd)
+        : Math.round(rows.reduce((s, r) => s + Number(r.lineBUph || 0), 0) / n);
+    const avgUph =
+      totalWorkHours > 0
+        ? Math.round(totalAct / totalWorkHours)
+        : lineAHrsYtd + lineBHrsYtd > 0
+        ? Math.round((lineAActYtd + lineBActYtd) / (lineAHrsYtd + lineBHrsYtd))
+        : Math.round(rows.reduce((s, r) => s + Number(r.avgUph || 0), 0) / n);
     const targetUph = Math.round(rows.reduce((s, r) => s + Number(r.targetUph || 0), 0) / n);
 
     const avgLineAUpph = Number(
@@ -148,7 +171,7 @@ export const SummaryPerformanceView: React.FC<SummaryPerformanceViewProps> = ({
       avgIdleOver5MinRate,
       latestRow: rows[rows.length - 1],
     };
-  }, [rows]);
+  }, [rows, monthlyEfficiency]);
 
   // Commit cell edit
   const handleCommitEdit = () => {
@@ -233,10 +256,10 @@ export const SummaryPerformanceView: React.FC<SummaryPerformanceViewProps> = ({
       lineBUph: 102,
       avgUph: 110,
       targetUph: 105,
-      lineAUpph: 0.98,
-      lineBUpph: 1.08,
-      avgUpph: 1.03,
-      targetUpph: 1.09,
+      lineAUpph: 18.0,
+      lineBUpph: 15.0,
+      avgUpph: 16.5,
+      targetUpph: 16.5,
       attendance: 212,
       idleOver1MinHours: 130.0,
       idleOver1MinRate: 35.0,
@@ -433,24 +456,28 @@ export const SummaryPerformanceView: React.FC<SummaryPerformanceViewProps> = ({
               </button>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center tabular-nums">
             <div className="bg-slate-50 p-2 rounded">
-              <div className="text-[10px] text-slate-500 font-semibold">AVG UPH (YTD)</div>
+              <div className="text-[10px] text-slate-500 font-semibold">
+                {t('รวม 2 ไลน์ YTD', 'Combined YTD', '双线合计 YTD')}
+              </div>
               <div className="text-xl font-black text-[#0070c0]">{summaryStats.avgUph}</div>
-              <div className="text-[10px] text-slate-500">Target: {summaryStats.targetUph}</div>
+              <div className="text-[10px] text-slate-500">
+                {t('เป้า', 'Target', '目标')}: {summaryStats.targetUph}
+              </div>
             </div>
             <div className="bg-sky-50/70 p-2 rounded">
-              <div className="text-[10px] text-slate-600 font-semibold">Line A UPH</div>
+              <div className="text-[10px] text-slate-600 font-semibold">Line A YTD</div>
               <div className="text-xl font-black text-[#0091da]">{summaryStats.avgLineAUph}</div>
               <div className="text-[10px] text-slate-500">
-                Latest: {summaryStats.latestRow?.lineAUph ?? '-'}
+                {t('ล่าสุด', 'Latest', '最新')}: {summaryStats.latestRow?.lineAUph ?? '-'}
               </div>
             </div>
             <div className="bg-indigo-50/70 p-2 rounded">
-              <div className="text-[10px] text-slate-600 font-semibold">Line B UPH</div>
+              <div className="text-[10px] text-slate-600 font-semibold">Line B YTD</div>
               <div className="text-xl font-black text-indigo-700">{summaryStats.avgLineBUph}</div>
               <div className="text-[10px] text-slate-500">
-                Latest: {summaryStats.latestRow?.lineBUph ?? '-'}
+                {t('ล่าสุด', 'Latest', '最新')}: {summaryStats.latestRow?.lineBUph ?? '-'}
               </div>
             </div>
           </div>
@@ -465,7 +492,7 @@ export const SummaryPerformanceView: React.FC<SummaryPerformanceViewProps> = ({
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800">2. UPPH Performance (人效)</h3>
-                <p className="text-[11px] text-slate-500">Units Per Person Per Hour</p>
+                <p className="text-[11px] text-slate-500">Direct Output ÷ Manpower</p>
               </div>
             </div>
             {onNavigateToSheet && (
@@ -582,34 +609,37 @@ export const SummaryPerformanceView: React.FC<SummaryPerformanceViewProps> = ({
             </div>
           </div>
           <svg viewBox="0 0 420 175" className="w-full h-auto">
-            {rows.map((r, i) => {
-              const step = 370 / Math.max(1, rows.length);
-              const cx = 30 + step * i + step / 2;
-              const hA = Math.min(115, (r.lineAUph / 150) * 115);
-              const hB = Math.min(115, (r.lineBUph / 150) * 115);
-              return (
-                <g key={r.id}>
-                  <rect x={cx - 8} y={140 - hA} width={7} height={hA} fill="#00b0f0" rx="1" />
-                  <rect x={cx + 1} y={140 - hB} width={7} height={hB} fill="#0070c0" rx="1" />
-                  <text
-                    x={cx}
-                    y={140 - Math.max(hA, hB) - 4}
-                    textAnchor="middle"
-                    className="text-[8.5px] font-bold fill-slate-700"
-                  >
-                    {r.avgUph}
-                  </text>
-                  <text
-                    x={cx}
-                    y={160}
-                    textAnchor="middle"
-                    className="text-[8.5px] fill-slate-500 font-medium"
-                  >
-                    {r.period.slice(5)}月
-                  </text>
-                </g>
-              );
-            })}
+            {(() => {
+              const maxUph = Math.max(...rows.flatMap(x => [x.lineAUph, x.lineBUph]), 175);
+              return rows.map((r, i) => {
+                const step = 370 / Math.max(1, rows.length);
+                const cx = 30 + step * i + step / 2;
+                const hA = Math.min(115, (r.lineAUph / maxUph) * 115);
+                const hB = Math.min(115, (r.lineBUph / maxUph) * 115);
+                return (
+                  <g key={r.id}>
+                    <rect x={cx - 8} y={140 - hA} width={7} height={hA} fill="#00b0f0" rx="1" />
+                    <rect x={cx + 1} y={140 - hB} width={7} height={hB} fill="#0070c0" rx="1" />
+                    <text
+                      x={cx}
+                      y={140 - Math.max(hA, hB) - 4}
+                      textAnchor="middle"
+                      className="text-[8.5px] font-bold fill-slate-700"
+                    >
+                      {r.avgUph}
+                    </text>
+                    <text
+                      x={cx}
+                      y={160}
+                      textAnchor="middle"
+                      className="text-[8.5px] fill-slate-500 font-medium"
+                    >
+                      {r.period.slice(5)}月
+                    </text>
+                  </g>
+                );
+              });
+            })()}
             <line x1="25" y1="140" x2="405" y2="140" stroke="#cbd5e1" strokeWidth="1" />
           </svg>
         </div>
@@ -627,34 +657,37 @@ export const SummaryPerformanceView: React.FC<SummaryPerformanceViewProps> = ({
             </div>
           </div>
           <svg viewBox="0 0 420 175" className="w-full h-auto">
-            {rows.map((r, i) => {
-              const step = 370 / Math.max(1, rows.length);
-              const cx = 30 + step * i + step / 2;
-              const hA = Math.min(115, (r.lineAUpph / 1.4) * 115);
-              const hB = Math.min(115, (r.lineBUpph / 1.4) * 115);
-              return (
-                <g key={r.id}>
-                  <rect x={cx - 8} y={140 - hA} width={7} height={hA} fill="#00b0f0" rx="1" />
-                  <rect x={cx + 1} y={140 - hB} width={7} height={hB} fill="#059669" rx="1" />
-                  <text
-                    x={cx}
-                    y={140 - Math.max(hA, hB) - 4}
-                    textAnchor="middle"
-                    className="text-[8.5px] font-bold fill-slate-700"
-                  >
-                    {r.avgUpph.toFixed(2)}
-                  </text>
-                  <text
-                    x={cx}
-                    y={160}
-                    textAnchor="middle"
-                    className="text-[8.5px] fill-slate-500 font-medium"
-                  >
-                    {r.period.slice(5)}月
-                  </text>
-                </g>
-              );
-            })}
+            {(() => {
+              const maxUpph = Math.max(...rows.flatMap(x => [x.lineAUpph, x.lineBUpph]), 25);
+              return rows.map((r, i) => {
+                const step = 370 / Math.max(1, rows.length);
+                const cx = 30 + step * i + step / 2;
+                const hA = Math.min(115, (r.lineAUpph / maxUpph) * 115);
+                const hB = Math.min(115, (r.lineBUpph / maxUpph) * 115);
+                return (
+                  <g key={r.id}>
+                    <rect x={cx - 8} y={140 - hA} width={7} height={hA} fill="#00b0f0" rx="1" />
+                    <rect x={cx + 1} y={140 - hB} width={7} height={hB} fill="#059669" rx="1" />
+                    <text
+                      x={cx}
+                      y={140 - Math.max(hA, hB) - 4}
+                      textAnchor="middle"
+                      className="text-[8.5px] font-bold fill-slate-700"
+                    >
+                      {r.avgUpph.toFixed(2)}
+                    </text>
+                    <text
+                      x={cx}
+                      y={160}
+                      textAnchor="middle"
+                      className="text-[8.5px] fill-slate-500 font-medium"
+                    >
+                      {r.period.slice(5)}月
+                    </text>
+                  </g>
+                );
+              });
+            })()}
             <line x1="25" y1="140" x2="405" y2="140" stroke="#cbd5e1" strokeWidth="1" />
           </svg>
         </div>

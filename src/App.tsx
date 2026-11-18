@@ -9,6 +9,7 @@ import { KpiCards } from './components/KpiCards';
 import { OecCharts } from './components/OecCharts';
 import { DailyMatrixTable } from './components/DailyMatrixTable';
 import { DailyTrendView } from './components/DailyTrendView';
+import { UphYtdSummarySection } from './components/UphYtdSummarySection';
 import { ImportModal } from './components/ImportModal';
 import { PresentationModal } from './components/PresentationModal';
 import { AddLineModal } from './components/AddLineModal';
@@ -101,7 +102,7 @@ export default function App() {
   const STORAGE_KEY_LINE_IDLE = 'oec_line_idle_sheet_v1';
   const STORAGE_KEY_SUMMARY_PERF = 'oec_summary_perf_v1';
   const STORAGE_KEY_OCT_SEEDED = 'oec_oct_2026_seeded_v1';
-  const STORAGE_KEY_NOV_SEEDED = 'oec_nov_2026_seeded_v2';
+  const STORAGE_KEY_NOV_SEEDED = 'oec_nov_2026_seeded_v3';
   const STORAGE_KEY_SEP_SEEDED = 'oec_sep_2026_full_v2';
   const STORAGE_KEY_AUG_SEEDED = 'oec_aug_2026_seeded_v1';
   const STORAGE_KEY_JUL_SEEDED = 'oec_jul_2026_seeded_v1';
@@ -131,8 +132,8 @@ export default function App() {
   const hasFullNovemberData = (entry?: { days?: DayColumn[]; lines?: LineOECData[] }) => {
     return Boolean(
       entry?.days?.some(d => d.day === 2) &&
-      entry?.days?.some(d => d.day === 14) &&
-      entry?.days?.some(d => d.day === 15) &&
+      entry?.days?.some(d => d.day === 16) &&
+      entry?.days?.some(d => d.day === 17) &&
       hasPeriodActualData(entry)
     );
   };
@@ -276,10 +277,20 @@ export default function App() {
     const m01 = sheet.monthlyData.find(m => m.month === '2026-01');
     const m07 = sheet.monthlyData.find(m => m.month === '2026-07');
     const m09 = sheet.monthlyData.find(m => m.month === '2026-09');
+    const m11 = sheet.monthlyData.find(m => m.month === '2026-11');
+    const novMatrix = sheet.periodMatrices['2026-11'];
+    const hasOldTarget = Boolean(
+      sheet.lines?.some(l =>
+        Object.values(l.targetUpph || {}).some(v => v !== null && v !== undefined && v > 0 && v < 5)
+      )
+    );
     return Boolean(
-      (m01 && m01.upphLineA === 0.94 && m01.upphLineB === 0.62) ||
-      (m07 && m07.upphLineA === 0.21) ||
-      (m09 && (m09.prodLineA === 58976 || m09.upphLineA === 0.96))
+      hasOldTarget ||
+      (m01 && (m01.upphLineA < 5 || m01.upphLineB < 5)) ||
+      (m07 && m07.upphLineB < 5) ||
+      (m09 && (m09.prodLineA === 58976 || m09.upphLineA < 5 || m09.upphLineB < 5)) ||
+      !novMatrix?.days?.some(d => d.day === 17) ||
+      (m11 && m11.prodLineA === 42340)
     );
   };
 
@@ -312,6 +323,8 @@ export default function App() {
         {
           ...INITIAL_UPPH_SHEET_DATA,
           activeMonth: cleaned.activeMonth || INITIAL_UPPH_SHEET_DATA.activeMonth || '2026-09',
+          days: cleaned.days?.length ? cleaned.days : INITIAL_UPPH_SHEET_DATA.days,
+          lines: cleaned.lines?.length ? cleaned.lines : INITIAL_UPPH_SHEET_DATA.lines,
           periodMatrices: cleaned.periodMatrices || INITIAL_UPPH_SHEET_DATA.periodMatrices,
         },
         targetPeriodData,
@@ -328,10 +341,12 @@ export default function App() {
     const r01 = rows.find(r => r.period === '2026-01');
     const r07 = rows.find(r => r.period === '2026-07');
     const r09 = rows.find(r => r.period === '2026-09');
+    const r11 = rows.find(r => r.period === '2026-11');
     return Boolean(
-      (r01 && r01.lineAUpph === 0.94 && r01.lineBUpph === 0.62) ||
-      (r07 && r07.lineAUpph === 0.21) ||
-      (r09 && (r09.lineAUpph === 0.96 || r09.totalAct === 101779))
+      (r01 && (r01.lineAUpph < 5 || r01.targetUpph < 5)) ||
+      (r07 && (r07.lineBUpph < 5 || r07.targetUpph < 5)) ||
+      (r09 && (r09.lineAUpph < 5 || r09.targetUpph < 5 || r09.totalAct === 101779)) ||
+      (r11 && r11.totalPlan === 71984 && (r11.totalAct === 60920 || r11.totalAct === 69649))
     );
   };
 
@@ -369,7 +384,11 @@ export default function App() {
           (mKey === '2026-06' && existing.lineAPlan === 42000 && existing.lineBAct === 40877) ||
           (mKey === '2026-07' && existing.lineAPlan === 500 && existing.lineAAct === 74) ||
           (mKey === '2026-08' && existing.lineAPlan === 52000 && existing.lineAAct === 50071) ||
-          (mKey === '2026-11' && existing.lineAAct === 37296 && existing.lineBAct === 23624))
+          (mKey === '2026-11' &&
+            ((existing.lineAAct === 37296 && existing.lineBAct === 23624) ||
+              (existing.lineAAct === 42340 &&
+                existing.lineBAct === 27309 &&
+                existing.lineAPlan === 44783))))
       ) {
         map.set(mKey, initRow);
       }
@@ -622,7 +641,10 @@ export default function App() {
           const idx = parsed.findIndex(r => r.period === '2026-11');
           if (idx === -1) {
             parsed = [...parsed, initNov];
-          } else if (parsed[idx].totalPlan === 71984 && parsed[idx].totalAct === 60920) {
+          } else if (
+            parsed[idx].totalPlan === 71984 &&
+            (parsed[idx].totalAct === 60920 || parsed[idx].totalAct === 69649)
+          ) {
             parsed = parsed.map((r, i) => (i === idx ? initNov : r));
           }
         }
@@ -1105,7 +1127,9 @@ export default function App() {
           if (initNovSummary) {
             mergedSummary = mergedSummary.some(r => r.period === '2026-11')
               ? mergedSummary.map(r =>
-                  r.period === '2026-11' && r.totalPlan === 71984 && r.totalAct === 60920
+                  r.period === '2026-11' &&
+                  r.totalPlan === 71984 &&
+                  (r.totalAct === 60920 || r.totalAct === 69649)
                     ? initNovSummary
                     : r
                 )
@@ -2062,6 +2086,104 @@ export default function App() {
     syncToCloud({ upphSheet: newUpphData, summaryPerformance: syncedSummary });
   };
 
+  // Update Daily OEC (Act / WorkTime / Planning) for any month directly from UPPH OEC Output comparison matrix
+  const handleUpdateOecCellForPeriod = (
+    monthKey: string,
+    lineId: string,
+    category: 'planning' | 'act' | 'workTime',
+    day: number,
+    value: number | null
+  ) => {
+    const baseEntry =
+      periodData[monthKey] ||
+      (monthKey === activePeriodKey ? { lines, days } : undefined);
+    if (!baseEntry) return;
+
+    const updatedEntryLines = baseEntry.lines.map(l => {
+      if (l.id !== lineId && l.prodLine.toLowerCase() !== lineId.toLowerCase()) {
+        return l;
+      }
+      return {
+        ...l,
+        [category]: {
+          ...l[category],
+          [day]: value,
+        },
+      };
+    });
+
+    const nextActiveLines = monthKey === activePeriodKey ? updatedEntryLines : lines;
+    if (monthKey === activePeriodKey) {
+      setLines(updatedEntryLines);
+    }
+
+    const nextPeriodData: PeriodStorageState = {
+      ...periodData,
+      [monthKey]: {
+        lines: updatedEntryLines,
+        days: baseEntry.days,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    setPeriodData(nextPeriodData);
+
+    // Recompute Line A & B monthlyEfficiency row for monthKey
+    const lineA = updatedEntryLines.find(l => l.prodLine.toLowerCase().includes('a')) || updatedEntryLines[0];
+    const lineB = updatedEntryLines.find(l => l.prodLine.toLowerCase().includes('b')) || updatedEntryLines[1];
+    let aPlan = 0, aAct = 0, aHours = 0;
+    let bPlan = 0, bAct = 0, bHours = 0;
+    baseEntry.days.forEach(d => {
+      if (lineA?.planning?.[d.day] != null) aPlan += Number(lineA.planning[d.day]);
+      if (lineA?.act?.[d.day] != null) aAct += Number(lineA.act[d.day]);
+      if (lineA?.workTime?.[d.day] != null) aHours += Number(lineA.workTime[d.day]);
+      if (lineB?.planning?.[d.day] != null) bPlan += Number(lineB.planning[d.day]);
+      if (lineB?.act?.[d.day] != null) bAct += Number(lineB.act[d.day]);
+      if (lineB?.workTime?.[d.day] != null) bHours += Number(lineB.workTime[d.day]);
+    });
+    const nextMonthlyEfficiency = monthlyEfficiency.map(m => {
+      if (m.month !== monthKey || m.manualOverride) return m;
+      return {
+        ...m,
+        lineAPlan: aPlan,
+        lineAAct: aAct,
+        lineAWorkHours: aHours,
+        lineAUph: aHours > 0 ? Math.round(aAct / aHours) : m.lineAUph,
+        lineBPlan: bPlan,
+        lineBAct: bAct,
+        lineBWorkHours: bHours,
+        lineBUph: bHours > 0 ? Math.round(bAct / bHours) : m.lineBUph,
+      };
+    });
+    setMonthlyEfficiency(nextMonthlyEfficiency);
+
+    const nextUpph = syncUpphSheetWithDailyOec(
+      upphSheet,
+      nextPeriodData,
+      nextMonthlyEfficiency,
+      upphSheet.activeMonth
+    );
+    setUpphSheet(nextUpph);
+
+    const nextSummary = syncSummaryPerformanceWithOecAndUpph(
+      summaryPerformance,
+      nextPeriodData,
+      nextMonthlyEfficiency,
+      nextUpph
+    );
+    setSummaryPerformance(nextSummary);
+    setHasUnsavedChanges(true);
+
+    debouncedCloudSave(
+      nextActiveLines,
+      days,
+      nextMonthlyEfficiency,
+      actionItems,
+      nextPeriodData,
+      nextUpph,
+      nextSummary
+    );
+  };
+
   const handleUpdateLineIdleSheet = (newIdleData: LineIdleSheetData) => {
     setLineIdleSheet(newIdleData);
     setHasUnsavedChanges(true);
@@ -2146,6 +2268,14 @@ export default function App() {
               totalWorkHours={totals.totalWorkHours}
             />
 
+            {/* YTD UPH Efficiency Summary: Combined 2 Lines & Split Line A / Line B */}
+            <UphYtdSummarySection
+              monthlyEfficiency={dynamicMonthlyEfficiency}
+              plantName={filters.plant === 'ทั้งหมด' ? 'HTC Ref(泰国冰箱)' : filters.plant}
+              selectedProdLine={filters.prodLine}
+              onOpenSummaryEfficiency={() => setActiveTab('summary-efficiency')}
+            />
+
             {/* Production & UPH Trend Charts matching image */}
             <OecCharts
               monthlyProduction={dynamicMonthlyProd}
@@ -2213,6 +2343,7 @@ export default function App() {
             periodData={periodData}
             monthlyEfficiency={dynamicMonthlyEfficiency}
             activePeriodKey={activePeriodKey}
+            onUpdateDailyOecCell={handleUpdateOecCellForPeriod}
             onSaveOnWeb={(customTitle?: string) => handleSaveOnWebNow(customTitle)}
             hasUnsavedChanges={hasUnsavedChanges}
             isSyncing={isSyncing}

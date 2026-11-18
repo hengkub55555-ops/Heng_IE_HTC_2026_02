@@ -44,13 +44,20 @@ interface UpphOecViewProps {
   periodData?: PeriodStorageState;
   monthlyEfficiency?: MonthlyEfficiencyRow[];
   activePeriodKey?: string;
+  onUpdateDailyOecCell?: (
+    monthKey: string,
+    lineId: string,
+    category: 'planning' | 'act' | 'workTime',
+    day: number,
+    value: number | null
+  ) => void;
   onSaveOnWeb?: (customTitle?: string) => void;
   hasUnsavedChanges?: boolean;
   isSyncing?: boolean;
   plantName?: string;
 }
 
-type EditableUpphCategory = 'onTheJob' | 'attendance' | 'targetUpph' | 'actUpph';
+type EditableUpphCategory = 'attendance' | 'targetUpph' | 'actUpph';
 
 export const UpphOecView: React.FC<UpphOecViewProps> = ({
   data,
@@ -60,6 +67,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
   periodData,
   monthlyEfficiency = [],
   activePeriodKey,
+  onUpdateDailyOecCell,
   onSaveOnWeb,
   hasUnsavedChanges = false,
   isSyncing = false,
@@ -106,7 +114,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
   const [showAddDayBar, setShowAddDayBar] = useState<boolean>(false);
   const [autoRecalcUpphOnAttendanceChange, setAutoRecalcUpphOnAttendanceChange] = useState<boolean>(true);
 
-  // Active cell editing state for the 2 right-hand matrices
+  // Quick Batch Fill Manpower state (for Table 1)
+  const [batchManpowerLineId, setBatchManpowerLineId] = useState<string>(data.lines[0]?.id || 'line-a');
+  const [batchManpowerVal, setBatchManpowerVal] = useState<string>('');
+
+  // Active cell editing state for the right-hand matrices
   const [editingCell, setEditingCell] = useState<{
     lineId: string;
     category: EditableUpphCategory;
@@ -114,17 +126,25 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
     val: string;
   } | null>(null);
 
+  // Active cell editing state for linked Daily OEC Output cells inside Table 1
+  const [editingOecCell, setEditingOecCell] = useState<{
+    lineId: string;
+    category: 'act';
+    day: number;
+    val: string;
+  } | null>(null);
+
   // Quick Entry state
   const [quickLineId, setQuickLineId] = useState<string>(data.lines[0]?.id || 'line-a');
   const [quickDay, setQuickDay] = useState<number>(data.days[data.days.length - 1]?.day || 25);
-  const [quickOnTheJob, setQuickOnTheJob] = useState<string>('');
   const [quickAttendance, setQuickAttendance] = useState<string>('');
+  const [quickOutputAct, setQuickOutputAct] = useState<string>('');
   const [quickTargetUpph, setQuickTargetUpph] = useState<string>('');
   const [quickActUpph, setQuickActUpph] = useState<string>('');
 
   // Batch Target UPPH state
-  const [batchTargetA, setBatchTargetA] = useState<string>('1.22');
-  const [batchTargetB, setBatchTargetB] = useState<string>('0.96');
+  const [batchTargetA, setBatchTargetA] = useState<string>('18.00');
+  const [batchTargetB, setBatchTargetB] = useState<string>('15.00');
 
   // Add Day state
   const [newDayNum, setNewDayNum] = useState<number>(26);
@@ -160,7 +180,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       l => l.id === line.id || l.prodLine.toLowerCase() === line.prodLine.toLowerCase()
     );
 
-  // Selected Month Per-Line Summary Statistics calculated straight from Daily OEC
+  // Selected Month Per-Line Summary Statistics: Direct Output ÷ Manpower
   const lineSummaries = useMemo(() => {
     const lineA = data.lines.find(l => l.prodLine.toLowerCase().includes('a')) || data.lines[0];
     const lineB = data.lines.find(l => l.prodLine.toLowerCase().includes('b')) || data.lines[1];
@@ -173,33 +193,28 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       : null;
 
     const totalAct = (sumA?.totalAct || 0) + (sumB?.totalAct || 0);
-    const totalWorkHours = (sumA?.totalWorkHours || 0) + (sumB?.totalWorkHours || 0);
-    const totalManHours = (sumA?.totalManHours || 0) + (sumB?.totalManHours || 0);
+    const totalManpower = (sumA?.totalManpower || 0) + (sumB?.totalManpower || 0);
+    const totalCoveredAct = (sumA?.coveredAct || 0) + (sumB?.coveredAct || 0);
+    const totalCoveredMp = (sumA?.coveredManpower || 0) + (sumB?.coveredManpower || 0);
     const avgAttendance = (sumA?.avgAttendance || 0) + (sumB?.avgAttendance || 0);
-    const factoryUph = totalWorkHours > 0 ? Math.round(totalAct / totalWorkHours) : 0;
     const factoryUpph =
-      totalManHours > 0
-        ? Number((totalAct / totalManHours).toFixed(2))
-        : totalWorkHours > 0 && avgAttendance > 0
-        ? Number((totalAct / (totalWorkHours * avgAttendance)).toFixed(2))
-        : 0;
+      totalCoveredMp > 0 ? Number((totalCoveredAct / totalCoveredMp).toFixed(2)) : 0;
 
-    return { sumA, sumB, totalAct, totalWorkHours, totalManHours, avgAttendance, factoryUph, factoryUpph };
+    return {
+      sumA,
+      sumB,
+      totalAct,
+      totalManpower,
+      avgAttendance,
+      factoryUpph,
+    };
   }, [data.days, data.lines, monthOecLines]);
-
-  // Helper to compute Total On-the-job for a line
-  const getLineTotalOnTheJob = (line: UpphLineData): number =>
-    calculateLinePeriodUpph(data.days, findMatchingOecLine(line), line).avgOnTheJob;
-
-  // Helper to compute Total Attendance for a line
-  const getLineTotalAttendance = (line: UpphLineData): number =>
-    calculateLinePeriodUpph(data.days, findMatchingOecLine(line), line).avgAttendance;
 
   // Helper to compute Total Target UPPH for a line
   const getLineTotalTargetUpph = (line: UpphLineData): number =>
     calculateLinePeriodUpph(data.days, findMatchingOecLine(line), line).totalTargetUpph;
 
-  // Helper to compute Total Act UPPH for a line from Daily OEC
+  // Helper to compute Total Act UPPH for a line from Daily Output ÷ Manpower
   const getLineTotalActUpph = (line: UpphLineData): number =>
     calculateLinePeriodUpph(data.days, findMatchingOecLine(line), line).totalActUpph;
 
@@ -301,7 +316,6 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       if (line.id !== lineId) return line;
 
       if (day === 'TOTAL') {
-        if (category === 'onTheJob') return { ...line, totalOnTheJobOverride: validNum };
         if (category === 'attendance') return { ...line, totalAttendanceOverride: validNum };
         if (category === 'targetUpph') return { ...line, totalTargetUpphOverride: validNum };
         if (category === 'actUpph') return { ...line, totalActUpphOverride: validNum };
@@ -317,24 +331,17 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       };
 
       // Clear total override for that category so Total dynamically reflects the updated daily cells
-      if (category === 'onTheJob') nextLine.totalOnTheJobOverride = null;
       if (category === 'attendance') {
         nextLine.totalAttendanceOverride = null;
         nextLine.totalActUpphOverride = null;
-        // Auto-recalc Act UPPH from Daily OEC Act / (WorkTime * Attendance)
-        if (autoRecalcUpphOnAttendanceChange && validNum && validNum > 0) {
+        // Auto-recalc Act UPPH strictly from Daily Output / Daily Manpower
+        if (autoRecalcUpphOnAttendanceChange) {
           const matchingOec = findMatchingOecLine(line);
-          const computed = calculateDailyActUpph(
-            matchingOec?.act[day],
-            matchingOec?.workTime[day],
-            validNum
-          );
-          if (computed !== null) {
-            nextLine.actUpph = {
-              ...nextLine.actUpph,
-              [day]: computed,
-            };
-          }
+          const computed = calculateDailyActUpph(matchingOec?.act[day], validNum);
+          nextLine.actUpph = {
+            ...nextLine.actUpph,
+            [day]: computed,
+          };
         }
       }
       if (category === 'targetUpph') nextLine.totalTargetUpphOverride = null;
@@ -347,6 +354,132 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
     setEditingCell(null);
   };
 
+  // Direct inline update for daily Manpower with instant UPPH = Output ÷ Manpower calculation
+  const handleDirectManpowerChange = (lineId: string, day: number, rawValue: string) => {
+    const trimmed = rawValue.trim();
+    const parsedNum = trimmed === '' ? null : Number(trimmed);
+    if (parsedNum !== null && isNaN(parsedNum)) return;
+    const validNum = parsedNum !== null ? Math.max(0, parsedNum) : null;
+
+    const updatedLines = data.lines.map(line => {
+      if (line.id !== lineId) return line;
+      const matchingOec = findMatchingOecLine(line);
+      const computed = autoRecalcUpphOnAttendanceChange
+        ? calculateDailyActUpph(matchingOec?.act[day], validNum)
+        : line.actUpph[day];
+      return {
+        ...line,
+        attendance: {
+          ...line.attendance,
+          [day]: validNum,
+        },
+        actUpph: autoRecalcUpphOnAttendanceChange
+          ? {
+              ...line.actUpph,
+              [day]: computed,
+            }
+          : line.actUpph,
+        totalAttendanceOverride: null,
+        totalActUpphOverride: null,
+      };
+    });
+
+    commitLinesAndSyncMonthly(updatedLines);
+  };
+
+  // Paste row of Manpower numbers from Excel directly across consecutive days
+  const handlePasteManpowerRow = (
+    lineId: string,
+    startDayIdx: number,
+    e: React.ClipboardEvent<HTMLInputElement>
+  ) => {
+    const text = e.clipboardData.getData('text');
+    const tokens = text
+      .trim()
+      .split(/[\t\n\r,;\s]+/)
+      .filter(Boolean);
+    if (tokens.length <= 1) return;
+    e.preventDefault();
+
+    const updatedLines = data.lines.map(line => {
+      if (line.id !== lineId) return line;
+      const matchingOec = findMatchingOecLine(line);
+      const nextAtt = { ...line.attendance };
+      const nextActUpph = { ...line.actUpph };
+
+      tokens.forEach((tok, offset) => {
+        const targetDayObj = data.days[startDayIdx + offset];
+        if (!targetDayObj) return;
+        const n = Number(tok.replace(/,/g, ''));
+        if (!isNaN(n) && n >= 0) {
+          nextAtt[targetDayObj.day] = n;
+          if (autoRecalcUpphOnAttendanceChange) {
+            nextActUpph[targetDayObj.day] = calculateDailyActUpph(
+              matchingOec?.act[targetDayObj.day],
+              n
+            );
+          }
+        }
+      });
+
+      return {
+        ...line,
+        attendance: nextAtt,
+        actUpph: nextActUpph,
+        totalAttendanceOverride: null,
+        totalActUpphOverride: null,
+      };
+    });
+
+    commitLinesAndSyncMonthly(updatedLines);
+  };
+
+  // Batch fill daily Manpower for all working days (or all days) of a selected line
+  const handleBatchFillManpower = (onlyWorkingDays: boolean) => {
+    const num = Number(batchManpowerVal);
+    if (isNaN(num) || num <= 0) return;
+
+    const updatedLines = data.lines.map(line => {
+      if (line.id !== batchManpowerLineId) return line;
+      const matchingOec = findMatchingOecLine(line);
+      const nextAtt = { ...line.attendance };
+      const nextActUpph = { ...line.actUpph };
+
+      data.days.forEach(d => {
+        const hasProd =
+          matchingOec?.act?.[d.day] != null && Number(matchingOec.act[d.day]) > 0;
+        if (!onlyWorkingDays || hasProd) {
+          nextAtt[d.day] = num;
+          nextActUpph[d.day] = calculateDailyActUpph(matchingOec?.act?.[d.day], num);
+        }
+      });
+
+      return {
+        ...line,
+        attendance: nextAtt,
+        actUpph: nextActUpph,
+        totalAttendanceOverride: null,
+        totalActUpphOverride: null,
+      };
+    });
+
+    commitLinesAndSyncMonthly(updatedLines);
+  };
+
+  // Commit Daily OEC Output edit directly from Table 1
+  const handleCommitOecCellEdit = () => {
+    if (!editingOecCell || !onUpdateDailyOecCell) {
+      setEditingOecCell(null);
+      return;
+    }
+    const { lineId, category, day, val } = editingOecCell;
+    const trimmed = val.trim();
+    const parsedNum = trimmed === '' ? null : Number(trimmed);
+    const validNum = parsedNum !== null && !isNaN(parsedNum) ? parsedNum : null;
+    onUpdateDailyOecCell(selectedMonthKey, lineId, category, day, validNum);
+    setEditingOecCell(null);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleCommitEdit();
@@ -357,28 +490,25 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
 
   // Quick Entry Apply
   const handleQuickEntrySave = () => {
+    if (onUpdateDailyOecCell && quickOutputAct.trim() !== '') {
+      onUpdateDailyOecCell(selectedMonthKey, quickLineId, 'act', quickDay, Number(quickOutputAct));
+    }
+
     const updatedLines = data.lines.map(line => {
       if (line.id !== quickLineId) return line;
       const nextLine = { ...line };
-      if (quickOnTheJob.trim() !== '') {
-        nextLine.onTheJob = { ...nextLine.onTheJob, [quickDay]: Number(quickOnTheJob) };
-        nextLine.totalOnTheJobOverride = null;
-      }
+      const matchingOec = findMatchingOecLine(line);
+      const effectiveAct =
+        quickOutputAct.trim() !== '' ? Number(quickOutputAct) : matchingOec?.act[quickDay];
+
       if (quickAttendance.trim() !== '') {
         const attNum = Number(quickAttendance);
         nextLine.attendance = { ...nextLine.attendance, [quickDay]: attNum };
         nextLine.totalAttendanceOverride = null;
         if (autoRecalcUpphOnAttendanceChange && attNum > 0 && quickActUpph.trim() === '') {
-          const matchingOec = findMatchingOecLine(line);
-          const computed = calculateDailyActUpph(
-            matchingOec?.act[quickDay],
-            matchingOec?.workTime[quickDay],
-            attNum
-          );
-          if (computed !== null) {
-            nextLine.actUpph = { ...nextLine.actUpph, [quickDay]: computed };
-            nextLine.totalActUpphOverride = null;
-          }
+          const computed = calculateDailyActUpph(effectiveAct, attNum);
+          nextLine.actUpph = { ...nextLine.actUpph, [quickDay]: computed };
+          nextLine.totalActUpphOverride = null;
         }
       }
       if (quickTargetUpph.trim() !== '') {
@@ -394,8 +524,8 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
 
     commitLinesAndSyncMonthly(updatedLines);
 
-    setQuickOnTheJob('');
     setQuickAttendance('');
+    setQuickOutputAct('');
     setQuickTargetUpph('');
     setQuickActUpph('');
 
@@ -447,7 +577,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       ...line,
       targetUpph: {
         ...line.targetUpph,
-        [newDayNum]: line.prodLine === 'Line A' ? 1.22 : 0.96,
+        [newDayNum]: line.prodLine === 'Line A' ? 18.0 : 15.0,
       },
     }));
 
@@ -491,8 +621,8 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
           month: monthStr,
           prodLineA: 50000,
           prodLineB: 42000,
-          upphLineA: 1.05,
-          upphLineB: 1.02,
+          upphLineA: 18.0,
+          upphLineB: 15.0,
         },
       ],
       updatedAt: new Date().toISOString(),
@@ -522,39 +652,38 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
 
     const aoa: (string | number | null)[][] = [headers];
 
-    // Top Table: Attendance
+    // Top Table: Direct Daily Manpower & Output -> UPPH (Output ÷ Manpower)
     data.lines.forEach(line => {
-      const totOtj = getLineTotalOnTheJob(line);
-      const totAtt = getLineTotalAttendance(line);
-      const totGap = totAtt - totOtj;
+      const matchingOec = findMatchingOecLine(line);
+      const periodSum = calculateLinePeriodUpph(data.days, matchingOec, line);
 
       aoa.push([
-        'Attendance OEC',
+        'Daily Manpower & UPPH',
         line.plant,
         line.prodLine,
-        'On-the-job(在册)',
-        totOtj,
-        ...data.days.map(d => line.onTheJob[d.day] ?? ''),
-      ]);
-      aoa.push([
-        'Attendance OEC',
-        line.plant,
-        line.prodLine,
-        'Attendance(出勤)',
-        totAtt,
+        'Manpower (คน/วัน)',
+        periodSum.totalManpower,
         ...data.days.map(d => line.attendance[d.day] ?? ''),
       ]);
       aoa.push([
-        'Attendance OEC',
+        'Daily Manpower & UPPH',
         line.plant,
         line.prodLine,
-        'Gap(差异)',
-        totGap,
+        'Output Act (产出)',
+        periodSum.totalAct,
+        ...data.days.map(d => matchingOec?.act[d.day] ?? ''),
+      ]);
+      aoa.push([
+        'Daily Manpower & UPPH',
+        line.plant,
+        line.prodLine,
+        'UPPH (Output ÷ Manpower)',
+        periodSum.totalActUpph,
         ...data.days.map(d => {
-          const otj = line.onTheJob[d.day];
-          const att = line.attendance[d.day];
-          if (otj == null || att == null) return '';
-          return Number(att) - Number(otj);
+          const val =
+            calculateDailyActUpph(matchingOec?.act[d.day], line.attendance[d.day]) ??
+            line.actUpph[d.day];
+          return val ?? '';
         }),
       ]);
     });
@@ -751,18 +880,18 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
               <span>{t('เพิ่มคอลัมน์วัน', 'Add Day', '新增日期列')}</span>
             </button>
 
-            {/* Auto-calc Act UPPH from Daily OEC */}
+            {/* Auto-calc Act UPPH from Daily OEC Output ÷ Manpower */}
             <button
               onClick={handleSyncActUpphFromDailyOec}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/25 transition-colors cursor-pointer"
               title={t(
-                'คำนวณ Act UPPH จากยอดผลิตจริง (Sheet 1) ÷ (ชั่วโมงทำงาน × คนมาทำงาน)',
-                'Calculate Act UPPH = Daily Act / (Work Hours × Attendance)',
-                '根据 Sheet 1 实际产量 ÷ (工时 × 出勤人数) 自动计算实际 UPPH'
+                'คำนวณ UPPH = ยอดผลิต Output (Daily OEC) ÷ ยอดคน Manpower รายวัน (ตรงแม่นยำ)',
+                'Calculate UPPH = Daily Output ÷ Daily Manpower',
+                '根据日清实际产量 Output ÷ 每日人力 Manpower 精确计算 UPPH'
               )}
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>{t('คำนวณ Act UPPH จากยอดผลิต', 'Calc UPPH from OEC', '由日清产量计算UPPH')}</span>
+              <span>{t('คำนวณ Output ÷ Manpower', 'Calc Output ÷ MP', '产量÷人力重算UPPH')}</span>
             </button>
           </div>
 
@@ -807,7 +936,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       </div>
 
       {/* =====================================================================
-          PER-LINE DAILY OEC -> UPPH SUMMARY CARDS FOR SELECTED MONTH
+          PER-LINE DAILY OUTPUT ÷ MANPOWER = UPPH SUMMARY CARDS
          ===================================================================== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
         {/* Line A Summary Card */}
@@ -826,18 +955,16 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 space-x-2">
-                  <span>Act: <strong className="text-slate-800">{(s?.totalAct || 0).toLocaleString()}</strong></span>
+                  <span>Output: <strong className="text-slate-800">{(s?.totalAct || 0).toLocaleString()}</strong></span>
                   <span>·</span>
-                  <span>Hrs: <strong className="text-slate-800">{s?.totalWorkHours || 0}h</strong></span>
+                  <span>Manpower: <strong className="text-slate-800">{(s?.totalManpower || 0).toLocaleString()}</strong></span>
                   <span>·</span>
-                  <span>UPH: <strong className="text-[#0091da]">{s?.uph || 0}</strong></span>
-                  <span>·</span>
-                  <span>Att: <strong className="text-slate-800">{s?.avgAttendance || 0}</strong></span>
+                  <span>Avg: <strong className="text-slate-700">{s?.avgAttendance || 0}/day</strong></span>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-[10px] font-semibold uppercase text-slate-400">
-                  {t('UPPH จริง / เป้า', 'Act / Target UPPH', '实际 / 目标 UPPH')}
+                  {t('UPPH (Output ÷ คน)', 'Act / Target UPPH', 'UPPH (产量 ÷ 人力)')}
                 </div>
                 <div className="flex items-baseline justify-end gap-1.5">
                   <span className="text-xl font-black text-[#0091da] tabular-nums">{upph.toFixed(2)}</span>
@@ -867,18 +994,16 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 space-x-2">
-                  <span>Act: <strong className="text-slate-800">{(s?.totalAct || 0).toLocaleString()}</strong></span>
+                  <span>Output: <strong className="text-slate-800">{(s?.totalAct || 0).toLocaleString()}</strong></span>
                   <span>·</span>
-                  <span>Hrs: <strong className="text-slate-800">{s?.totalWorkHours || 0}h</strong></span>
+                  <span>Manpower: <strong className="text-slate-800">{(s?.totalManpower || 0).toLocaleString()}</strong></span>
                   <span>·</span>
-                  <span>UPH: <strong className="text-[#0070c0]">{s?.uph || 0}</strong></span>
-                  <span>·</span>
-                  <span>Att: <strong className="text-slate-800">{s?.avgAttendance || 0}</strong></span>
+                  <span>Avg: <strong className="text-slate-700">{s?.avgAttendance || 0}/day</strong></span>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-[10px] font-semibold uppercase text-slate-400">
-                  {t('UPPH จริง / เป้า', 'Act / Target UPPH', '实际 / 目标 UPPH')}
+                  {t('UPPH (Output ÷ คน)', 'Act / Target UPPH', 'UPPH (产量 ÷ 人力)')}
                 </div>
                 <div className="flex items-baseline justify-end gap-1.5">
                   <span className="text-xl font-black text-[#0070c0] tabular-nums">{upph.toFixed(2)}</span>
@@ -903,20 +1028,20 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                 <div className="flex items-center gap-1.5">
                   <Calculator className="w-3.5 h-3.5 text-sky-400" />
                   <span className="text-xs font-extrabold">
-                    {t('รวมโรงงาน (อิง Daily OEC)', 'Plant Weighted UPPH', '全厂加权 UPPH')} · {selectedMonthKey}
+                    {t('รวมโรงงาน (Output ÷ Manpower)', 'Plant UPPH (Output ÷ MP)', '全厂综合 UPPH')} · {selectedMonthKey}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-300 mt-1 space-x-2">
-                  <span>Act: <strong className="text-white">{lineSummaries.totalAct.toLocaleString()}</strong></span>
+                  <span>Output: <strong className="text-white">{lineSummaries.totalAct.toLocaleString()}</strong></span>
                   <span>·</span>
-                  <span>UPH: <strong className="text-sky-300">{lineSummaries.factoryUph}</strong></span>
+                  <span>Manpower: <strong className="text-sky-300">{lineSummaries.totalManpower.toLocaleString()}</strong></span>
                   <span>·</span>
-                  <span>Att: <strong className="text-white">{lineSummaries.avgAttendance}</strong></span>
+                  <span>Avg: <strong className="text-white">{lineSummaries.avgAttendance}/day</strong></span>
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-[10px] font-semibold uppercase text-slate-400">
-                  Act ÷ (Hrs × Att)
+                  Output ÷ Manpower
                 </div>
                 <div className="flex items-baseline justify-end gap-1.5">
                   <span className="text-xl font-black text-sky-300 tabular-nums">{upph.toFixed(2)}</span>
@@ -941,9 +1066,9 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
               <Edit3 className="w-4 h-4 text-emerald-700" />
               <span>
                 {t(
-                  'แถบกรอกและปรับข้อมูล UPPH & อัตรากำลังคนรายวันด่วน (Quick Daily Attendance & UPPH Editor)',
-                  'Quick Daily Attendance & UPPH Editor',
-                  '每日出勤与 UPPH 快速编辑栏'
+                  'แถบกรอก Manpower & Output รายวันด่วน → คำนวณ UPPH = Output ÷ Manpower',
+                  'Quick Daily Manpower & Output Editor (UPPH = Output ÷ Manpower)',
+                  '每日人力与产量快速录入 (UPPH = 产量 ÷ 人力)'
                 )}
               </span>
             </div>
@@ -956,9 +1081,9 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
               />
               <span>
                 {t(
-                  'คำนวณ Act UPPH อัตโนมัติเมื่อแก้จำนวนคนมาทำงาน (Attendance)',
-                  'Auto-recalculate Act UPPH when Attendance changes',
-                  '修改出勤人数时自动重算实际 UPPH'
+                  'คำนวณ UPPH อัตโนมัติทันทีเมื่อแก้ยอด Manpower',
+                  'Auto-recalculate UPPH when Manpower changes',
+                  '修改 Manpower 时自动计算 UPPH'
                 )}
               </span>
             </label>
@@ -994,33 +1119,58 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5">
-              <label className="font-semibold text-slate-700">On-the-job(在册):</label>
+              <label className="font-semibold text-[#0070c0]">Manpower (คน):</label>
               <input
                 type="number"
-                placeholder="เช่น 125"
-                value={quickOnTheJob}
-                onChange={e => setQuickOnTheJob(e.target.value)}
-                className="w-20 bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 font-semibold"
-              />
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <label className="font-semibold text-slate-700">Attendance(出勤):</label>
-              <input
-                type="number"
-                placeholder="เช่น 117"
+                placeholder={String(data.lines.find(l => l.id === quickLineId)?.attendance[quickDay] ?? 119)}
                 value={quickAttendance}
                 onChange={e => setQuickAttendance(e.target.value)}
-                className="w-20 bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 font-semibold"
+                className="w-20 bg-white border-2 border-[#0070c0]/60 rounded px-2 py-1 text-slate-900 font-bold"
               />
             </div>
 
+            {(() => {
+              const qLine = data.lines.find(l => l.id === quickLineId) || data.lines[0];
+              const qOec = qLine ? findMatchingOecLine(qLine) : undefined;
+              const curAct = qOec?.act[quickDay];
+              const effAct = quickOutputAct.trim() !== '' ? Number(quickOutputAct) : curAct;
+              const effMp =
+                quickAttendance.trim() !== ''
+                  ? Number(quickAttendance)
+                  : qLine?.attendance[quickDay];
+              const previewUpph = calculateDailyActUpph(effAct, effMp);
+              return (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <label className="font-semibold text-slate-700">Output (Act):</label>
+                    <input
+                      type="number"
+                      placeholder={curAct != null ? String(curAct) : '0'}
+                      value={quickOutputAct}
+                      onChange={e => setQuickOutputAct(e.target.value)}
+                      disabled={!onUpdateDailyOecCell}
+                      className="w-20 bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 font-semibold"
+                    />
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 bg-white border border-emerald-300 rounded px-2.5 py-1 font-bold text-emerald-800">
+                    <Calculator className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>
+                      UPPH (Output ÷ MP):{' '}
+                      <span className="text-sm font-black text-emerald-700">
+                        {previewUpph !== null ? previewUpph.toFixed(2) : '-'}
+                      </span>
+                    </span>
+                  </div>
+                </>
+              );
+            })()}
+
             <div className="flex items-center gap-1.5">
-              <label className="font-semibold text-slate-700">Target UPPH(目标):</label>
+              <label className="font-semibold text-slate-700">Target UPPH:</label>
               <input
                 type="number"
                 step="0.01"
-                placeholder="เช่น 1.22"
+                placeholder="18.00"
                 value={quickTargetUpph}
                 onChange={e => setQuickTargetUpph(e.target.value)}
                 className="w-20 bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 font-semibold"
@@ -1028,11 +1178,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5">
-              <label className="font-semibold text-slate-700">Act UPPH(实际):</label>
+              <label className="font-semibold text-slate-700">Act UPPH:</label>
               <input
                 type="number"
                 step="0.01"
-                placeholder="เช่น 1.32"
+                placeholder="Auto"
                 value={quickActUpph}
                 onChange={e => setQuickActUpph(e.target.value)}
                 className="w-20 bg-white border border-slate-300 rounded px-2 py-1 text-slate-900 font-semibold"
@@ -1471,7 +1621,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                 const innerH = svgH - pad.top - pad.bottom;
 
                 const allVals = items.flatMap(m => [m.upphLineA, m.upphLineB]);
-                const maxVal = Math.max(...allVals, 1.4) * 1.15;
+                const maxVal = Math.max(...allVals, 20) * 1.15;
                 const minVal = 0;
 
                 const getX = (i: number) =>
@@ -1645,27 +1795,72 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
           }
         >
           {/* =================================================================
-              TABLE 1 (TOP-RIGHT): ATTENDANCE OEC MATRIX
-              On-the-job(在册) | Attendance(出勤) | Gap(差异)
+              TABLE 1 (TOP-RIGHT): DIRECT DAILY MANPOWER -> OUTPUT ÷ MANPOWER = UPPH MATRIX
              ================================================================= */}
           <div className="bg-white rounded-md border border-slate-300 shadow-xs overflow-hidden">
-            <div className="bg-slate-100 px-3 py-1.5 border-b border-slate-300 flex flex-wrap items-center justify-between gap-2">
+            <div className="bg-slate-100 px-3 py-2 border-b border-slate-300 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-[#0070c0]" />
                 <span className="text-xs font-bold text-slate-800">
                   {t(
-                    'ตารางที่ 1: อัตรากำลังคนรายวัน — On-the-job(在册) / Attendance(出勤) / Gap(差异)',
-                    'Table 1: Daily Manpower & Attendance OEC — On-the-job(在册) / Attendance(出勤) / Gap(差异)',
-                    '表 1: 每日在册与出勤日清表 — On-the-job(在册) / Attendance(出勤) / Gap(差异)'
+                    'ตารางที่ 1: ใส่ยอด Manpower รายวัน → หาร Output รายวัน = UPPH (ตรงแม่นยำ)',
+                    'Table 1: Daily Manpower Input → Output ÷ Manpower = UPPH',
+                    '表 1: 每日人力 Manpower 录入 → 每日产量 ÷ 人力 = UPPH'
                   )}
                 </span>
               </div>
-              <span className="text-[11px] text-[#0070c0] font-semibold">
+
+              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                {/* Batch fill daily Manpower */}
+                <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded px-1.5 py-0.5">
+                  <span className="font-semibold text-slate-600">
+                    {t('ใส่ Manpower ทั้งเดือน:', 'Fill Manpower:', '批量填人力:')}
+                  </span>
+                  <select
+                    value={batchManpowerLineId}
+                    onChange={e => setBatchManpowerLineId(e.target.value)}
+                    className="font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+                  >
+                    {data.lines.map(l => (
+                      <option key={`mp-sel-${l.id}`} value={l.id}>{l.prodLine}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="119"
+                    value={batchManpowerVal}
+                    onChange={e => setBatchManpowerVal(e.target.value)}
+                    className="w-12 text-center border border-slate-300 rounded px-1 py-0 text-[11px] font-bold text-[#0070c0]"
+                  />
+                  <button
+                    onClick={() => handleBatchFillManpower(true)}
+                    className="px-1.5 py-0.5 bg-[#0070c0] hover:bg-[#005a9e] text-white font-semibold rounded cursor-pointer"
+                    title={t('ใส่ค่า Manpower ในทุกวันที่มีการผลิต', 'Apply to all working days with output', '应用至所有生产日')}
+                  >
+                    {t('วันที่ผลิต', 'Work Days', '工作日')}
+                  </button>
+                  <button
+                    onClick={() => handleBatchFillManpower(false)}
+                    className="px-1.5 py-0.5 bg-slate-700 hover:bg-slate-800 text-white font-semibold rounded cursor-pointer"
+                    title={t('ใส่ค่า Manpower ทุกวันในตาราง', 'Apply to all days in table', '应用至全部日期')}
+                  >
+                    {t('ทุกวัน', 'All', '全部')}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-sky-50/80 px-3 py-1 border-b border-sky-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-sky-900">
+              <span>
                 {t(
-                  '* คลิกที่ตัวเลขเพื่อแก้ไขได้ทันที (Gap = Attendance - On-the-job)',
-                  '* Click any cell to edit (Gap = Attendance - On-the-job)',
-                  '* 点击任意单元格即可修改 (Gap = 出勤 - 在册)'
+                  'ใส่เฉพาะตัวเลขยอด Manpower รายวันลงในช่องสีฟ้า (รองรับวางจาก Excel / กด Enter-ลูกศร) → คำนวณ Output ÷ Manpower = UPPH ตรงแม่นยำ ไม่คิดจากปัจจัยอื่น',
+                  'Enter only daily Manpower in the blue input cells (supports Excel paste & Enter/Arrow keys) → Direct UPPH = Daily Output ÷ Daily Manpower',
+                  '在蓝色框仅输入每日人力 Manpower 数值（支持 Excel 整行粘贴）→ 直接按 每日产量 ÷ 每日人力 = UPPH 精确核算，不受其他因素影响'
                 )}
+              </span>
+              <span className="font-bold text-[#0070c0]">
+                {t('เดือนที่เลือก:', 'Month:', '当前月份:')} {selectedMonthKey}
               </span>
             </div>
 
@@ -1675,32 +1870,32 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                   <tr className="bg-[#0070c0] text-white font-bold">
                     <th
                       rowSpan={2}
-                      className="border border-blue-800 px-2 py-1 text-center sticky left-0 z-20 bg-[#0070c0] min-w-[78px]"
+                      className="border border-blue-800 px-2 py-1 text-center sticky left-0 z-20 bg-[#0070c0] min-w-[74px]"
                     >
                       Plant
                     </th>
                     <th
                       rowSpan={2}
-                      className="border border-blue-800 px-2 py-1 text-center sticky left-[78px] z-20 bg-[#0070c0] min-w-[64px]"
+                      className="border border-blue-800 px-2 py-1 text-center sticky left-[74px] z-20 bg-[#0070c0] min-w-[60px]"
                     >
                       Prod-line
                     </th>
                     <th
                       rowSpan={2}
-                      className="border border-blue-800 px-2 py-1 text-left sticky left-[142px] z-20 bg-[#0070c0] min-w-[118px]"
+                      className="border border-blue-800 px-2 py-1 text-left sticky left-[134px] z-20 bg-[#0070c0] min-w-[152px]"
                     >
                       Category
                     </th>
                     <th
                       rowSpan={2}
-                      className="border border-blue-800 px-2 py-1 text-center sticky left-[260px] z-20 bg-[#005a9e] min-w-[48px]"
+                      className="border border-blue-800 px-2 py-1 text-center sticky left-[286px] z-20 bg-[#005a9e] min-w-[72px]"
                     >
                       Total
                     </th>
                     {data.days.map(d => (
                       <th
                         key={`att-day-${d.day}`}
-                        className="border border-blue-800 px-1.5 py-0.5 text-center min-w-[40px]"
+                        className="border border-blue-800 px-1.5 py-0.5 text-center min-w-[50px]"
                       >
                         {d.day}
                       </th>
@@ -1719,15 +1914,15 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                 </thead>
                 <tbody>
                   {filteredLines.map((line, lineIdx) => {
-                    const totalOtj = getLineTotalOnTheJob(line);
-                    const totalAtt = getLineTotalAttendance(line);
-                    const totalGap = totalAtt - totalOtj;
-                    const totalPlantRows = filteredLines.length * 3;
+                    const matchingOec = findMatchingOecLine(line);
+                    const periodSum = calculateLinePeriodUpph(data.days, matchingOec, line);
+                    const rowsPerLine = 3;
+                    const totalPlantRows = filteredLines.length * rowsPerLine;
 
                     return (
                       <React.Fragment key={`att-${line.id}`}>
-                        {/* ROW 1: On-the-job(在册) */}
-                        <tr className="hover:bg-blue-50/40 transition-colors">
+                        {/* ROW 1: Manpower (คน/วัน) — DIRECT NUMERIC INPUT */}
+                        <tr className="bg-sky-50/40 hover:bg-sky-50/80 transition-colors">
                           {lineIdx === 0 && (
                             <td
                               rowSpan={totalPlantRows}
@@ -1739,92 +1934,26 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                             </td>
                           )}
                           <td
-                            rowSpan={3}
-                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-800 bg-white sticky left-[78px] z-10 align-middle"
+                            rowSpan={rowsPerLine}
+                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-800 bg-white sticky left-[74px] z-10 align-middle"
                           >
                             {line.prodLine}
                           </td>
-                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-800 bg-slate-50 sticky left-[142px] z-10 whitespace-nowrap">
-                            On-the-job(在册)
+                          <td className="border border-slate-300 px-2 py-1 font-bold text-[#005a9e] bg-sky-50 sticky left-[134px] z-10 whitespace-nowrap">
+                            {t('Manpower (คน/วัน)', 'Manpower (Pax/Day)', 'Manpower (每日人力)')}
                           </td>
 
-                          {/* Total On-the-job */}
+                          {/* Total Manpower */}
                           <td
                             onClick={() =>
-                              handleStartEdit(line.id, 'onTheJob', 'TOTAL', totalOtj)
+                              handleStartEdit(line.id, 'attendance', 'TOTAL', periodSum.avgAttendance)
                             }
-                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-900 bg-slate-100 sticky left-[260px] z-10 cursor-pointer hover:bg-blue-100"
-                            title={t('คลิกเพื่อแก้ไขค่า Total', 'Click to edit Total', '点击修改合计值')}
-                          >
-                            {editingCell?.lineId === line.id &&
-                            editingCell?.category === 'onTheJob' &&
-                            editingCell?.day === 'TOTAL' ? (
-                              <input
-                                autoFocus
-                                type="number"
-                                value={editingCell.val}
-                                onChange={e =>
-                                  setEditingCell({ ...editingCell, val: e.target.value })
-                                }
-                                onBlur={handleCommitEdit}
-                                onKeyDown={handleKeyDown}
-                                className="w-12 text-center bg-white border border-[#0070c0] rounded px-0.5 py-0 text-[11px] font-bold focus:outline-none"
-                              />
-                            ) : (
-                              totalOtj
+                            className="border border-slate-300 px-1.5 py-1 text-center font-black text-[#005a9e] bg-sky-100/80 sticky left-[286px] z-10 cursor-pointer hover:bg-sky-200 tabular-nums"
+                            title={t(
+                              `รวม Manpower: ${periodSum.totalManpower.toLocaleString()} คน (เฉลี่ย ${periodSum.avgAttendance} คน/วัน)`,
+                              `Total Manpower: ${periodSum.totalManpower.toLocaleString()} (Avg ${periodSum.avgAttendance}/day)`,
+                              `累计人力: ${periodSum.totalManpower.toLocaleString()} 人 (日均 ${periodSum.avgAttendance} 人)`
                             )}
-                          </td>
-
-                          {/* Daily On-the-job cells */}
-                          {data.days.map(d => {
-                            const val = line.onTheJob[d.day];
-                            const isEditing =
-                              editingCell?.lineId === line.id &&
-                              editingCell?.category === 'onTheJob' &&
-                              editingCell?.day === d.day;
-
-                            return (
-                              <td
-                                key={`otj-${line.id}-${d.day}`}
-                                onClick={() =>
-                                  handleStartEdit(line.id, 'onTheJob', d.day, val)
-                                }
-                                className="border border-slate-300 px-1 py-1 text-center text-slate-800 hover:bg-blue-50 cursor-pointer"
-                              >
-                                {isEditing ? (
-                                  <input
-                                    autoFocus
-                                    type="number"
-                                    value={editingCell.val}
-                                    onChange={e =>
-                                      setEditingCell({ ...editingCell, val: e.target.value })
-                                    }
-                                    onBlur={handleCommitEdit}
-                                    onKeyDown={handleKeyDown}
-                                    className="w-11 text-center bg-white border border-[#0070c0] rounded px-0.5 py-0 text-[11px] font-bold focus:outline-none"
-                                  />
-                                ) : val !== null && val !== undefined ? (
-                                  val
-                                ) : (
-                                  ''
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-
-                        {/* ROW 2: Attendance(出勤) */}
-                        <tr className="hover:bg-blue-50/40 transition-colors">
-                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-800 bg-slate-50 sticky left-[142px] z-10 whitespace-nowrap">
-                            Attendance(出勤)
-                          </td>
-
-                          {/* Total Attendance */}
-                          <td
-                            onClick={() =>
-                              handleStartEdit(line.id, 'attendance', 'TOTAL', totalAtt)
-                            }
-                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-900 bg-slate-100 sticky left-[260px] z-10 cursor-pointer hover:bg-blue-100"
                           >
                             {editingCell?.lineId === line.id &&
                             editingCell?.category === 'attendance' &&
@@ -1838,43 +1967,113 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                                 }
                                 onBlur={handleCommitEdit}
                                 onKeyDown={handleKeyDown}
-                                className="w-12 text-center bg-white border border-[#0070c0] rounded px-0.5 py-0 text-[11px] font-bold focus:outline-none"
+                                className="w-14 text-center bg-white border border-[#0070c0] rounded px-0.5 py-0 text-[11px] font-bold focus:outline-none"
                               />
                             ) : (
-                              totalAtt
+                              periodSum.totalManpower.toLocaleString()
                             )}
                           </td>
 
-                          {/* Daily Attendance cells */}
-                          {data.days.map(d => {
+                          {/* Direct inline numeric Manpower input per day */}
+                          {data.days.map((d, dayIdx) => {
                             const val = line.attendance[d.day];
-                            const isEditing =
-                              editingCell?.lineId === line.id &&
-                              editingCell?.category === 'attendance' &&
-                              editingCell?.day === d.day;
-
                             return (
                               <td
                                 key={`att-${line.id}-${d.day}`}
-                                onClick={() =>
-                                  handleStartEdit(line.id, 'attendance', d.day, val)
-                                }
-                                className="border border-slate-300 px-1 py-1 text-center text-slate-800 hover:bg-blue-50 cursor-pointer"
+                                className="border border-slate-300 p-0.5 text-center bg-sky-50/30"
                               >
-                                {isEditing ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  data-mp-input={`${line.id}-${dayIdx}`}
+                                  value={val !== null && val !== undefined ? val : ''}
+                                  placeholder="-"
+                                  onChange={e =>
+                                    handleDirectManpowerChange(line.id, d.day, e.target.value)
+                                  }
+                                  onPaste={e => handlePasteManpowerRow(line.id, dayIdx, e)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                                      const nextEl = document.querySelector<HTMLInputElement>(
+                                        `input[data-mp-input="${line.id}-${dayIdx + 1}"]`
+                                      );
+                                      if (nextEl) {
+                                        e.preventDefault();
+                                        nextEl.focus();
+                                        nextEl.select();
+                                      }
+                                    } else if (e.key === 'ArrowLeft') {
+                                      const prevEl = document.querySelector<HTMLInputElement>(
+                                        `input[data-mp-input="${line.id}-${dayIdx - 1}"]`
+                                      );
+                                      if (prevEl) {
+                                        e.preventDefault();
+                                        prevEl.focus();
+                                        prevEl.select();
+                                      }
+                                    }
+                                  }}
+                                  className="w-full min-w-[44px] text-center bg-white/90 hover:bg-white focus:bg-white border border-sky-300 focus:border-[#0070c0] focus:ring-1 focus:ring-[#0070c0] rounded px-0.5 py-0.5 text-[11px] font-bold text-slate-900 focus:outline-none tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                              </td>
+                            );
+                          })}
+                        </tr>
+
+                        {/* ROW 2: Output (Act · Daily OEC) */}
+                        <tr className="bg-amber-50/35 hover:bg-amber-50/70 transition-colors">
+                          <td className="border border-slate-300 px-2 py-1 font-semibold text-amber-950 bg-amber-50/90 sticky left-[134px] z-10 whitespace-nowrap">
+                            {t('Output (Daily OEC)', 'Output (Daily OEC)', 'Output (日清实际产出)')}
+                          </td>
+                          <td className="border border-slate-300 px-1.5 py-1 text-center font-extrabold text-amber-950 bg-amber-100/80 sticky left-[286px] z-10 tabular-nums">
+                            {periodSum.totalAct.toLocaleString()}
+                          </td>
+                          {data.days.map(d => {
+                            const actVal = matchingOec?.act[d.day];
+                            const isEditingOec =
+                              editingOecCell?.lineId === line.id &&
+                              editingOecCell?.category === 'act' &&
+                              editingOecCell?.day === d.day;
+
+                            return (
+                              <td
+                                key={`oec-act-${line.id}-${d.day}`}
+                                onClick={() => {
+                                  if (onUpdateDailyOecCell) {
+                                    setEditingOecCell({
+                                      lineId: line.id,
+                                      category: 'act',
+                                      day: d.day,
+                                      val: actVal != null ? String(actVal) : '',
+                                    });
+                                  }
+                                }}
+                                className={`border border-slate-300 px-1 py-1 text-center font-semibold text-slate-800 tabular-nums ${
+                                  onUpdateDailyOecCell ? 'cursor-pointer hover:bg-amber-100/60' : ''
+                                }`}
+                                title={t(
+                                  'ยอดผลิตจริง (Output) จาก Daily OEC (คลิกเพื่อแก้ไขได้)',
+                                  'Daily Output (Act) from Daily OEC (click to edit)',
+                                  '来自 Daily OEC 的实际产量 (点击可修改)'
+                                )}
+                              >
+                                {isEditingOec ? (
                                   <input
                                     autoFocus
                                     type="number"
-                                    value={editingCell.val}
+                                    value={editingOecCell.val}
                                     onChange={e =>
-                                      setEditingCell({ ...editingCell, val: e.target.value })
+                                      setEditingOecCell({ ...editingOecCell, val: e.target.value })
                                     }
-                                    onBlur={handleCommitEdit}
-                                    onKeyDown={handleKeyDown}
-                                    className="w-11 text-center bg-white border border-[#0070c0] rounded px-0.5 py-0 text-[11px] font-bold focus:outline-none"
+                                    onBlur={handleCommitOecCellEdit}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') handleCommitOecCellEdit();
+                                      else if (e.key === 'Escape') setEditingOecCell(null);
+                                    }}
+                                    className="w-12 text-center bg-white border border-amber-500 rounded px-0.5 py-0 text-[11px] font-bold focus:outline-none"
                                   />
-                                ) : val !== null && val !== undefined ? (
-                                  val
+                                ) : actVal != null ? (
+                                  Number(actVal).toLocaleString()
                                 ) : (
                                   ''
                                 )}
@@ -1883,38 +2082,53 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                           })}
                         </tr>
 
-                        {/* ROW 3: Gap(差异) = Attendance - On-the-job */}
-                        <tr className="bg-slate-50/70 border-b-2 border-slate-300">
-                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-700 bg-slate-100 sticky left-[142px] z-10 whitespace-nowrap">
-                            Gap(差异)
+                        {/* ROW 3: COMPUTED UPPH = Output ÷ Manpower */}
+                        <tr className="bg-emerald-50/60 border-b-2 border-slate-400">
+                          <td className="border border-slate-300 px-2 py-1.5 font-extrabold text-emerald-950 bg-emerald-100/90 sticky left-[134px] z-10 whitespace-nowrap">
+                            {t('UPPH (Output ÷ คน)', 'UPPH (Output ÷ MP)', 'UPPH (产量 ÷ 人力)')}
                           </td>
                           <td
-                            className={`border border-slate-300 px-1.5 py-1 text-center font-bold bg-slate-100 sticky left-[260px] z-10 ${
-                              totalGap < 0 ? 'text-red-600' : 'text-slate-900'
+                            className={`border border-slate-300 px-1.5 py-1.5 text-center font-black bg-emerald-100 sticky left-[286px] z-10 tabular-nums ${
+                              periodSum.totalActUpph >= periodSum.totalTargetUpph
+                                ? 'text-emerald-700'
+                                : 'text-rose-600'
                             }`}
+                            title={`Period UPPH: ${periodSum.coveredAct.toLocaleString()} ÷ ${periodSum.coveredManpower.toLocaleString()} Manpower = ${periodSum.totalActUpph.toFixed(2)} (Target: ${periodSum.totalTargetUpph.toFixed(2)})`}
                           >
-                            {totalGap}
+                            {periodSum.totalActUpph.toFixed(2)}
                           </td>
                           {data.days.map(d => {
-                            const otj = line.onTheJob[d.day];
-                            const att = line.attendance[d.day];
-                            const hasBoth =
-                              otj !== null &&
-                              otj !== undefined &&
-                              att !== null &&
-                              att !== undefined;
-                            const gapVal = hasBoth ? Number(att) - Number(otj) : null;
+                            const actVal = matchingOec?.act[d.day];
+                            const mpVal = line.attendance[d.day];
+                            const tgtVal =
+                              line.targetUpph[d.day] ??
+                              (line.prodLine.toLowerCase().includes('a')
+                                ? UPPH_DEFAULT_TARGETS.lineA
+                                : UPPH_DEFAULT_TARGETS.lineB);
+                            const dayUpph = calculateDailyActUpph(actVal, mpVal);
+                            const isMet = dayUpph !== null && dayUpph >= Number(tgtVal);
 
                             return (
                               <td
-                                key={`att-gap-${line.id}-${d.day}`}
-                                className={`border border-slate-300 px-1 py-1 text-center font-semibold ${
-                                  gapVal !== null && gapVal < 0
-                                    ? 'text-red-600'
-                                    : 'text-slate-800'
+                                key={`upph-day-calc-${line.id}-${d.day}`}
+                                className={`border border-slate-300 px-1 py-1.5 text-center font-black tabular-nums ${
+                                  dayUpph === null
+                                    ? 'text-slate-300 bg-slate-50/40'
+                                    : isMet
+                                    ? 'text-emerald-700 bg-emerald-50/80'
+                                    : 'text-rose-600 bg-rose-50/70'
                                 }`}
+                                title={
+                                  dayUpph !== null
+                                    ? `Output ${Number(actVal).toLocaleString()} ÷ ${mpVal} Manpower = ${dayUpph.toFixed(2)} UPPH (Target: ${Number(tgtVal).toFixed(2)})`
+                                    : t(
+                                        'ใส่ยอด Manpower เพื่อคำนวณ UPPH',
+                                        'Enter Manpower to calculate UPPH',
+                                        '输入 Manpower 以计算 UPPH'
+                                      )
+                                }
                               >
-                                {gapVal !== null ? gapVal : ''}
+                                {dayUpph !== null ? dayUpph.toFixed(2) : '-'}
                               </td>
                             );
                           })}
@@ -1937,9 +2151,9 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                 <Gauge className="w-4 h-4 text-[#0070c0]" />
                 <span className="text-xs font-bold text-slate-800">
                   {t(
-                    'ตารางที่ 2: ประสิทธิภาพรายคนต่อชั่วโมง (UPPH) — Target UPPH(目标) / Act UPPH(实际) / Gap(差异)',
-                    'Table 2: Daily UPPH Matrix — Target UPPH(目标) / Act UPPH(实际) / Gap(差异)',
-                    '表 2: 每日人均小时产出 (UPPH) 日清表 — Target UPPH(目标) / Act UPPH(实际) / Gap(差异)'
+                    'ตารางที่ 2: UPPH จริงเทียบเป้าหมาย (Output ÷ Manpower) — Target UPPH(目标) / Act UPPH(实际) / Gap(差异)',
+                    'Table 2: Daily UPPH Target vs Actual (Output ÷ Manpower) — Target / Act / Gap',
+                    '表 2: 每日 UPPH 目标与实际对比 (产量 ÷ 人力) — Target UPPH(目标) / Act UPPH(实际) / Gap(差异)'
                   )}
                 </span>
               </div>
@@ -1958,32 +2172,32 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                   <tr className="bg-[#0070c0] text-white font-bold">
                     <th
                       rowSpan={2}
-                      className="border border-blue-800 px-2 py-1 text-center sticky left-0 z-20 bg-[#0070c0] min-w-[78px]"
+                      className="border border-blue-800 px-2 py-1 text-center sticky left-0 z-20 bg-[#0070c0] min-w-[74px]"
                     >
                       Plant
                     </th>
                     <th
                       rowSpan={2}
-                      className="border border-blue-800 px-2 py-1 text-center sticky left-[78px] z-20 bg-[#0070c0] min-w-[64px]"
+                      className="border border-blue-800 px-2 py-1 text-center sticky left-[74px] z-20 bg-[#0070c0] min-w-[60px]"
                     >
                       Prod-line
                     </th>
                     <th
                       rowSpan={2}
-                      className="border border-blue-800 px-2 py-1 text-left sticky left-[142px] z-20 bg-[#0070c0] min-w-[118px]"
+                      className="border border-blue-800 px-2 py-1 text-left sticky left-[134px] z-20 bg-[#0070c0] min-w-[152px]"
                     >
                       Category
                     </th>
                     <th
                       rowSpan={2}
-                      className="border border-blue-800 px-2 py-1 text-center sticky left-[260px] z-20 bg-[#005a9e] min-w-[48px]"
+                      className="border border-blue-800 px-2 py-1 text-center sticky left-[286px] z-20 bg-[#005a9e] min-w-[64px]"
                     >
                       Total
                     </th>
                     {data.days.map(d => (
                       <th
                         key={`upph-day-${d.day}`}
-                        className="border border-blue-800 px-1.5 py-0.5 text-center min-w-[40px]"
+                        className="border border-blue-800 px-1.5 py-0.5 text-center min-w-[50px]"
                       >
                         {d.day}
                       </th>
@@ -2023,11 +2237,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                           )}
                           <td
                             rowSpan={3}
-                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-800 bg-white sticky left-[78px] z-10 align-middle"
+                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-800 bg-white sticky left-[74px] z-10 align-middle"
                           >
                             {line.prodLine}
                           </td>
-                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-800 bg-slate-50 sticky left-[142px] z-10 whitespace-nowrap">
+                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-800 bg-slate-50 sticky left-[134px] z-10 whitespace-nowrap">
                             Target UPPH(目标)
                           </td>
 
@@ -2036,7 +2250,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                             onClick={() =>
                               handleStartEdit(line.id, 'targetUpph', 'TOTAL', totalTarget)
                             }
-                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-900 bg-slate-100 sticky left-[260px] z-10 cursor-pointer hover:bg-blue-100"
+                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-900 bg-slate-100 sticky left-[286px] z-10 cursor-pointer hover:bg-blue-100 tabular-nums"
                           >
                             {editingCell?.lineId === line.id &&
                             editingCell?.category === 'targetUpph' &&
@@ -2072,7 +2286,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                                 onClick={() =>
                                   handleStartEdit(line.id, 'targetUpph', d.day, val)
                                 }
-                                className="border border-slate-300 px-1 py-1 text-center text-slate-800 hover:bg-blue-50 cursor-pointer"
+                                className="border border-slate-300 px-1 py-1 text-center text-slate-800 hover:bg-blue-50 cursor-pointer tabular-nums"
                               >
                                 {isEditing ? (
                                   <input
@@ -2099,7 +2313,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
 
                         {/* ROW 2: Act UPPH(实际) */}
                         <tr className="hover:bg-blue-50/40 transition-colors">
-                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-800 bg-slate-50 sticky left-[142px] z-10 whitespace-nowrap">
+                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-800 bg-slate-50 sticky left-[134px] z-10 whitespace-nowrap">
                             Act UPPH(实际)
                           </td>
 
@@ -2108,7 +2322,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                             onClick={() =>
                               handleStartEdit(line.id, 'actUpph', 'TOTAL', totalAct)
                             }
-                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-900 bg-slate-100 sticky left-[260px] z-10 cursor-pointer hover:bg-blue-100"
+                            className="border border-slate-300 px-1.5 py-1 text-center font-bold text-slate-900 bg-slate-100 sticky left-[286px] z-10 cursor-pointer hover:bg-blue-100 tabular-nums"
                           >
                             {editingCell?.lineId === line.id &&
                             editingCell?.category === 'actUpph' &&
@@ -2144,7 +2358,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                                 onClick={() =>
                                   handleStartEdit(line.id, 'actUpph', d.day, val)
                                 }
-                                className="border border-slate-300 px-1 py-1 text-center text-slate-900 font-medium hover:bg-blue-50 cursor-pointer"
+                                className="border border-slate-300 px-1 py-1 text-center text-slate-900 font-medium hover:bg-blue-50 cursor-pointer tabular-nums"
                               >
                                 {isEditing ? (
                                   <input
@@ -2171,11 +2385,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
 
                         {/* ROW 3: Gap(差异) = Act UPPH - Target UPPH */}
                         <tr className="bg-slate-50/70 border-b-2 border-slate-300">
-                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-700 bg-slate-100 sticky left-[142px] z-10 whitespace-nowrap">
+                          <td className="border border-slate-300 px-2 py-1 font-semibold text-slate-700 bg-slate-100 sticky left-[134px] z-10 whitespace-nowrap">
                             Gap(差异)
                           </td>
                           <td
-                            className={`border border-slate-300 px-1.5 py-1 text-center font-bold bg-slate-100 sticky left-[260px] z-10 ${
+                            className={`border border-slate-300 px-1.5 py-1 text-center font-bold bg-slate-100 sticky left-[286px] z-10 tabular-nums ${
                               totalGap < 0 ? 'text-red-600' : 'text-slate-900'
                             }`}
                           >
@@ -2218,7 +2432,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
       </div>
 
       {/* =====================================================================
-          ALL-MONTHS LINE UPPH CALCULATION TABLE (DERIVED FROM DAILY OEC)
+          ALL-MONTHS LINE UPPH CALCULATION TABLE (DIRECT OUTPUT ÷ MANPOWER)
          ===================================================================== */}
       <div className="bg-white rounded-md border border-slate-300 shadow-xs overflow-hidden">
         <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -2226,17 +2440,17 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
             <TrendingUp className="w-4 h-4 text-sky-400" />
             <h3 className="text-xs sm:text-sm font-bold">
               {t(
-                'ตารางสรุปผลการคำนวณ UPPH แยกรายไลน์ทุกเดือน (อิงข้อมูล Daily OEC: Act ÷ (WorkTime × Attendance))',
-                'Monthly UPPH Calculation Matrix by Production Line (Derived from Daily OEC)',
-                '月度各产线 UPPH 核算汇总表（基于 Daily OEC：实际产量 ÷ (工时 × 出勤)）'
+                'ตารางสรุปผลการคำนวณ UPPH แยกรายไลน์ทุกเดือน (สูตรตรง: ยอดผลิต Output ÷ ยอดคน Manpower)',
+                'Monthly UPPH Matrix by Line (Direct Formula: Output ÷ Manpower)',
+                '月度各产线 UPPH 核算汇总表（直接公式：实际产量 Output ÷ 人力 Manpower）'
               )}
             </h3>
           </div>
           <span className="text-[11px] text-sky-300 font-medium">
             {t(
-              'คลิกแถวเดือนใดก็ได้เพื่อเปิดดูตาราง UPPH รายวันของเดือนนั้นด้านบน',
-              'Click any month row to load its daily UPPH matrix above',
-              '点击任意月份行即可在上方查看该月每日 UPPH 明细表'
+              'คลิกแถวเดือนใดก็ได้เพื่อเปิดดู/กรอก Manpower รายวันของเดือนนั้นด้านบน',
+              'Click any month row to load its daily Manpower & UPPH matrix above',
+              '点击任意月份行即可在上方查看/录入该月每日 Manpower 与 UPPH'
             )}
           </span>
         </div>
@@ -2246,17 +2460,15 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
                 <th className="border-r border-slate-200 px-3 py-2 text-center">Month</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-right text-[#0091da]">Line A Act</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line A Hrs</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line A UPH</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line A Att</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-right text-[#0091da]">Line A Output</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line A Manpower</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line A Avg/Day</th>
                 <th className="border-r border-slate-200 px-2.5 py-2 text-center bg-sky-50 text-[#0091da]">Line A UPPH</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-right text-[#0070c0]">Line B Act</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line B Hrs</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line B UPH</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line B Att</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-right text-[#0070c0]">Line B Output</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line B Manpower</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Line B Avg/Day</th>
                 <th className="border-r border-slate-200 px-2.5 py-2 text-center bg-blue-50 text-[#0070c0]">Line B UPPH</th>
-                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Total Att</th>
+                <th className="border-r border-slate-200 px-2.5 py-2 text-center">Total Manpower</th>
                 <th className="px-2.5 py-2 text-center bg-slate-900 text-white">Plant UPPH</th>
               </tr>
             </thead>
@@ -2274,20 +2486,19 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                 const sB = uB && mat ? calculateLinePeriodUpph(mat.days, oecB, uB) : null;
 
                 const aAct = sA ? sA.totalAct : eff?.lineAAct || m.prodLineA;
-                const aHrs = sA ? sA.totalWorkHours : eff?.lineAWorkHours || 0;
-                const aUph = sA ? sA.uph : eff?.lineAUph || (aHrs > 0 ? Math.round(aAct / aHrs) : 0);
-                const aAtt = sA ? sA.avgAttendance : 0;
+                const aMp = sA ? sA.totalManpower : 0;
+                const aAvg = sA ? sA.avgAttendance : 0;
 
                 const bAct = sB ? sB.totalAct : eff?.lineBAct || m.prodLineB;
-                const bHrs = sB ? sB.totalWorkHours : eff?.lineBWorkHours || 0;
-                const bUph = sB ? sB.uph : eff?.lineBUph || (bHrs > 0 ? Math.round(bAct / bHrs) : 0);
-                const bAtt = sB ? sB.avgAttendance : 0;
+                const bMp = sB ? sB.totalManpower : 0;
+                const bAvg = sB ? sB.avgAttendance : 0;
 
-                const totAtt = aAtt + bAtt;
-                const totManHrs = (sA?.totalManHours || 0) + (sB?.totalManHours || 0);
+                const totMp = aMp + bMp;
+                const totCoveredAct = (sA?.coveredAct || 0) + (sB?.coveredAct || 0);
+                const totCoveredMp = (sA?.coveredManpower || 0) + (sB?.coveredManpower || 0);
                 const plantUpph =
-                  totManHrs > 0
-                    ? Number(((aAct + bAct) / totManHrs).toFixed(2))
+                  totCoveredMp > 0
+                    ? Number((totCoveredAct / totCoveredMp).toFixed(2))
                     : Number(((m.upphLineA + m.upphLineB) / 2).toFixed(2));
                 const isSelected = m.month === selectedMonthKey;
 
@@ -2308,14 +2519,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                     <td className="border-r border-slate-200 px-2.5 py-1.5 text-right tabular-nums">
                       {aAct.toLocaleString()}
                     </td>
-                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-600">
-                      {aHrs}
-                    </td>
-                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-semibold text-slate-800">
-                      {aUph}
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-700 font-semibold">
+                      {aMp > 0 ? aMp.toLocaleString() : '-'}
                     </td>
                     <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-600">
-                      {aAtt || '-'}
+                      {aAvg || '-'}
                     </td>
                     <td
                       className={`border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-extrabold bg-sky-50/70 ${
@@ -2327,14 +2535,11 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                     <td className="border-r border-slate-200 px-2.5 py-1.5 text-right tabular-nums">
                       {bAct.toLocaleString()}
                     </td>
-                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-600">
-                      {bHrs}
-                    </td>
-                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-semibold text-slate-800">
-                      {bUph}
+                    <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-700 font-semibold">
+                      {bMp > 0 ? bMp.toLocaleString() : '-'}
                     </td>
                     <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums text-slate-600">
-                      {bAtt || '-'}
+                      {bAvg || '-'}
                     </td>
                     <td
                       className={`border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-extrabold bg-blue-50/70 ${
@@ -2344,7 +2549,7 @@ export const UpphOecView: React.FC<UpphOecViewProps> = ({
                       {m.upphLineB.toFixed(2)}
                     </td>
                     <td className="border-r border-slate-200 px-2.5 py-1.5 text-center tabular-nums font-semibold text-slate-700">
-                      {totAtt || '-'}
+                      {totMp > 0 ? totMp.toLocaleString() : '-'}
                     </td>
                     <td
                       className={`px-2.5 py-1.5 text-center tabular-nums font-black ${

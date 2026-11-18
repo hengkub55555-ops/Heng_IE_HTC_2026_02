@@ -362,35 +362,47 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
       </div>
 
       {/* 4 Executive YTD Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
         {/* Card 1: Line A YTD */}
         <div className="bg-gradient-to-br from-[#0284c7] to-[#0369a1] text-white rounded-lg p-4 shadow-sm border border-sky-600 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-sky-200">Line A (ตู้เย็น 2 ประตู)</span>
-              <span className="text-[10px] bg-sky-900/60 px-2 py-0.5 rounded font-medium">Actual YTD</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-sky-200">
+                {t('Line A (ตู้เย็น 2 ประตู)', 'Line A (2-Door Ref)', 'Line A (双门冰箱)')}
+              </span>
+              <span className="text-[10px] bg-sky-900/60 px-2 py-0.5 rounded font-medium">
+                {t('UPH YTD แยกไลน์', 'Line A YTD', 'Line A 年度累计')}
+              </span>
             </div>
-            <div className="text-3xl font-black tracking-tight">
-              {ytdStats.lineAActYTD.toLocaleString()}
-              <span className="text-xs font-normal text-sky-200 ml-1">ตัว</span>
+            <div className="text-3xl font-black tracking-tight flex items-baseline gap-2">
+              <span>{ytdStats.lineAAvgUphYTD}</span>
+              <span className="text-xs font-medium text-sky-200">
+                UPH YTD ({ytdStats.lineAWorkHoursYTD > 0 ? (ytdStats.lineAActYTD / ytdStats.lineAWorkHoursYTD).toFixed(1) : '0.0'})
+              </span>
             </div>
           </div>
 
           <div className="mt-3 pt-3 border-t border-sky-400/30 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <span className="text-[11px] text-sky-200 block">AVG UPH YTD:</span>
-              <span className="font-extrabold text-base text-amber-200 flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5 text-amber-300" />
-                {ytdStats.lineAAvgUphYTD}
+              <span className="text-[11px] text-sky-200 block">
+                {t('ผลิตจริง / ชม. YTD:', 'Act / Hrs YTD:', '累计产量 / 工时:')}
               </span>
-              <span className="text-[10px] text-sky-200">เป้าหมาย 110</span>
+              <span className="font-extrabold text-sm text-amber-200 flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                {ytdStats.lineAActYTD.toLocaleString()} / {ytdStats.lineAWorkHoursYTD.toLocaleString()}h
+              </span>
+              <span className="text-[10px] text-sky-200">
+                {t('เป้า 110 UPH', 'Target 110 UPH', '目标 110 UPH')}
+              </span>
             </div>
             <div>
-              <span className="text-[11px] text-sky-200 block">บรรลุแผน:</span>
+              <span className="text-[11px] text-sky-200 block">
+                {t('บรรลุแผน:', 'Achieved:', '计划达成率:')}
+              </span>
               <span className="font-extrabold text-base text-white">
                 {ytdStats.lineAAchieveRate.toFixed(1)}%
               </span>
-              <span className="text-[10px] text-sky-200">
+              <span className="text-[10px] text-sky-200 block">
                 Gap: {ytdStats.lineAGapYTD > 0 ? `+${ytdStats.lineAGapYTD.toLocaleString()}` : ytdStats.lineAGapYTD.toLocaleString()}
               </span>
             </div>
@@ -401,91 +413,123 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
         <div className="bg-gradient-to-br from-[#1e3a8a] to-[#172554] text-white rounded-lg p-4 shadow-sm border border-blue-900 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-200">Line B (ตู้เย็น 1 ประตู)</span>
-              <span className="text-[10px] bg-blue-950/70 px-2 py-0.5 rounded font-medium">Actual YTD</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-200">
+                {t('Line B (ตู้เย็น 1 ประตู)', 'Line B (1-Door Ref)', 'Line B (单门冰箱)')}
+              </span>
+              <span className="text-[10px] bg-blue-950/70 px-2 py-0.5 rounded font-medium">
+                {t('UPH YTD แยกไลน์', 'Line B YTD', 'Line B 年度累计')}
+              </span>
             </div>
-            <div className="text-3xl font-black tracking-tight">
-              {ytdStats.lineBActYTD.toLocaleString()}
-              <span className="text-xs font-normal text-blue-200 ml-1">ตัว</span>
+            <div className="text-3xl font-black tracking-tight flex items-baseline gap-2">
+              <span>{ytdStats.lineBAvgUphYTD}</span>
+              <span className="text-xs font-medium text-blue-200">
+                UPH YTD ({ytdStats.lineBWorkHoursYTD > 0 ? (ytdStats.lineBActYTD / ytdStats.lineBWorkHoursYTD).toFixed(1) : '0.0'})
+              </span>
             </div>
           </div>
 
           <div className="mt-3 pt-3 border-t border-blue-400/20 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <span className="text-[11px] text-blue-200 block">AVG UPH YTD:</span>
-              <span className="font-extrabold text-base text-amber-300 flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5 text-amber-300" />
-                {ytdStats.lineBAvgUphYTD}
+              <span className="text-[11px] text-blue-200 block">
+                {t('ผลิตจริง / ชม. YTD:', 'Act / Hrs YTD:', '累计产量 / 工时:')}
               </span>
-              <span className="text-[10px] text-blue-200">เป้าหมาย 100</span>
+              <span className="font-extrabold text-sm text-amber-300 flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                {ytdStats.lineBActYTD.toLocaleString()} / {ytdStats.lineBWorkHoursYTD.toLocaleString()}h
+              </span>
+              <span className="text-[10px] text-blue-200">
+                {t('เป้า 100 UPH', 'Target 100 UPH', '目标 100 UPH')}
+              </span>
             </div>
             <div>
-              <span className="text-[11px] text-blue-200 block">บรรลุแผน:</span>
+              <span className="text-[11px] text-blue-200 block">
+                {t('บรรลุแผน:', 'Achieved:', '计划达成率:')}
+              </span>
               <span className="font-extrabold text-base text-white">
                 {ytdStats.lineBAchieveRate.toFixed(1)}%
               </span>
-              <span className="text-[10px] text-blue-200">
+              <span className="text-[10px] text-blue-200 block">
                 Gap: {ytdStats.lineBGapYTD > 0 ? `+${ytdStats.lineBGapYTD.toLocaleString()}` : ytdStats.lineBGapYTD.toLocaleString()}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Total Plant Production YTD */}
+        {/* Card 3: Total Plant Production YTD (Both Lines) */}
         <div className="bg-[#0070c0] text-white rounded-lg p-4 shadow-sm border border-blue-600 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-100">Total Plant Output</span>
-              <span className="text-[10px] bg-blue-900/60 px-2 py-0.5 rounded font-medium">Line A + B YTD</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-100">
+                {t('ยอดผลิตรวมทั้ง 2 ไลน์', 'Total Output (Line A+B)', '双线总产量 YTD')}
+              </span>
+              <span className="text-[10px] bg-blue-900/60 px-2 py-0.5 rounded font-medium">
+                {ytdStats.totalMonths} {t('เดือน', 'Mos', '个月')} YTD
+              </span>
             </div>
             <div className="text-3xl font-black tracking-tight">
               {ytdStats.totalPlantActYTD.toLocaleString()}
-              <span className="text-xs font-normal text-blue-100 ml-1">ตัว</span>
+              <span className="text-xs font-normal text-blue-100 ml-1">
+                {t('ตัว', 'Units', '台')}
+              </span>
             </div>
           </div>
 
           <div className="mt-3 pt-3 border-t border-blue-400/30 flex items-center justify-between text-xs">
             <div>
-              <span className="text-[11px] text-blue-100 block">ชั่วโมงทำงานรวม:</span>
+              <span className="text-[11px] text-blue-100 block">
+                {t('ชั่วโมงทำงานรวม:', 'Total Hours:', '总工时:')}
+              </span>
               <span className="font-bold text-white flex items-center gap-1">
                 <Clock className="w-3 h-3 text-blue-200" />
-                {ytdStats.totalPlantWorkHoursYTD.toLocaleString()} ชม.
+                {ytdStats.totalPlantWorkHoursYTD.toLocaleString()} {t('ชม.', 'hrs', '时')}
               </span>
             </div>
             <div className="text-right">
-              <span className="text-[11px] text-blue-100 block">เป้าสะสม YTD:</span>
+              <span className="text-[11px] text-blue-100 block">
+                {t('เป้าสะสม YTD:', 'Plan YTD:', '累计计划:')}
+              </span>
               <span className="font-bold text-white">
-                {ytdStats.totalPlantPlanYTD.toLocaleString()} ตัว
+                {ytdStats.totalPlantPlanYTD.toLocaleString()} {t('ตัว', 'Units', '台')}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Card 4: Overall AVG UPH */}
+        {/* Card 4: Overall Combined UPH YTD (Both Lines) */}
         <div className="bg-gradient-to-br from-emerald-700 to-teal-900 text-white rounded-lg p-4 shadow-sm border border-emerald-600 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-200">Factory Combined UPH</span>
-              <span className="text-[10px] bg-emerald-950/70 px-2 py-0.5 rounded font-medium">Weighted AVG</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-200">
+                {t('UPH YTD รวมทั้ง 2 ไลน์', 'Combined UPH YTD (A+B)', '双线合计 UPH YTD')}
+              </span>
+              <span className="text-[10px] bg-emerald-950/70 px-2 py-0.5 rounded font-medium">
+                Weighted AVG
+              </span>
             </div>
             <div className="text-3xl font-black tracking-tight flex items-baseline gap-2">
               <span>{ytdStats.plantAvgUphYTD}</span>
-              <span className="text-xs font-medium text-emerald-200">Units/Hour</span>
+              <span className="text-xs font-medium text-emerald-200">
+                UPH YTD ({ytdStats.totalPlantWorkHoursYTD > 0 ? (ytdStats.totalPlantActYTD / ytdStats.totalPlantWorkHoursYTD).toFixed(1) : '0.0'})
+              </span>
             </div>
           </div>
 
           <div className="mt-3 pt-3 border-t border-emerald-500/30 flex items-center justify-between text-xs">
             <div>
-              <span className="text-[11px] text-emerald-200 block">อัตราเฉลี่ยต่อเดือน:</span>
+              <span className="text-[11px] text-emerald-200 block">
+                {t('Line A · Line B YTD:', 'Line A · Line B YTD:', '分线 YTD 对比:')}
+              </span>
               <span className="font-bold text-white">
-                {Math.round(ytdStats.totalPlantActYTD / ytdStats.totalMonths).toLocaleString()} ตัว/ด.
+                {ytdStats.lineAAvgUphYTD} · {ytdStats.lineBAvgUphYTD} UPH
               </span>
             </div>
             <div className="text-right">
-              <span className="text-[11px] text-emerald-200 block">ดัชนีภาพรวม:</span>
+              <span className="text-[11px] text-emerald-200 block">
+                {t('ดัชนีภาพรวม:', 'Plan Index:', '计划达成:')}
+              </span>
               <span className="font-bold text-emerald-200 flex items-center justify-end gap-0.5">
                 <Award className="w-3.5 h-3.5 text-amber-300" />
-                {ytdStats.plantAchieveRate.toFixed(1)}% Plan
+                {ytdStats.plantAchieveRate.toFixed(1)}%
               </span>
             </div>
           </div>
@@ -498,29 +542,39 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
           <div>
             <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
               <BarChart2 className="w-4 h-4 text-[#0070c0]" />
-              <span>แนวโน้มประสิทธิภาพรายเดือนเปรียบเทียบ Line A vs Line B</span>
+              <span>
+                {t(
+                  'แนวโน้มประสิทธิภาพรายเดือนเปรียบเทียบ Line A vs Line B',
+                  'Monthly Efficiency Trend: Line A vs Line B',
+                  '月度效率趋势对比：Line A 与 Line B'
+                )}
+              </span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              กราฟแท่งและเส้นเปรียบเทียบประสิทธิภาพ UPH และปริมาณผลผลิตรายเดือนจริง
+              {t(
+                'กราฟแท่งเปรียบเทียบประสิทธิภาพ UPH และปริมาณผลผลิตรายเดือนจริง',
+                'Monthly UPH efficiency and actual production volume comparison',
+                '月度 UPH 效率与实际产量对比柱状图'
+              )}
             </p>
           </div>
 
           <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded border border-slate-200 text-xs">
             <button
               onClick={() => setActiveChartTab('uph')}
-              className={`px-3 py-1 rounded font-medium transition-colors ${
+              className={`px-3 py-1 rounded font-medium transition-colors cursor-pointer ${
                 activeChartTab === 'uph' ? 'bg-white text-[#0070c0] shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              เปรียบเทียบ UPH (Efficiency)
+              {t('เปรียบเทียบ UPH (Efficiency)', 'UPH Comparison', 'UPH 效率对比')}
             </button>
             <button
               onClick={() => setActiveChartTab('volume')}
-              className={`px-3 py-1 rounded font-medium transition-colors ${
+              className={`px-3 py-1 rounded font-medium transition-colors cursor-pointer ${
                 activeChartTab === 'volume' ? 'bg-white text-[#0070c0] shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              ยอดผลิตรายเดือน (Volume)
+              {t('ยอดผลิตรายเดือน (Volume)', 'Monthly Volume', '月度产量')}
             </button>
           </div>
         </div>
@@ -531,20 +585,34 @@ export const SummaryEfficiencyView: React.FC<SummaryEfficiencyViewProps> = ({
             <div className="min-w-[700px] h-64 flex flex-col justify-end pt-4 pb-2">
               {/* Bars and lines */}
               <div className="flex-1 flex items-end justify-between gap-2 px-6 border-b border-slate-300 relative">
-                {/* Benchmark Lines: Line A Target 110, Line B Target 100 */}
-                <div className="absolute inset-x-6 top-[28%] border-b border-dashed border-sky-400 z-0 opacity-70">
-                  <span className="text-[10px] text-sky-600 bg-white/80 px-1 font-semibold absolute -top-3 right-0">
-                    Line A Target (110 UPH)
-                  </span>
-                </div>
-                <div className="absolute inset-x-6 top-[36%] border-b border-dashed border-blue-800 z-0 opacity-70">
-                  <span className="text-[10px] text-blue-900 bg-white/80 px-1 font-semibold absolute -top-3 left-0">
-                    Line B Target (100 UPH)
-                  </span>
-                </div>
+                {(() => {
+                  const maxChartUph = Math.max(...data.flatMap(d => [d.lineAUph, d.lineBUph]), 175);
+                  const lineAPos = Math.min(95, (110 / maxChartUph) * 100);
+                  const lineBPos = Math.min(95, (100 / maxChartUph) * 100);
+                  return (
+                    <>
+                      <div
+                        style={{ bottom: `${lineAPos}%` }}
+                        className="absolute inset-x-6 border-b border-dashed border-sky-400 z-0 opacity-70"
+                      >
+                        <span className="text-[10px] text-sky-600 bg-white/80 px-1 font-semibold absolute -top-3 right-0">
+                          Line A Target (110 UPH)
+                        </span>
+                      </div>
+                      <div
+                        style={{ bottom: `${lineBPos}%` }}
+                        className="absolute inset-x-6 border-b border-dashed border-blue-800 z-0 opacity-70"
+                      >
+                        <span className="text-[10px] text-blue-900 bg-white/80 px-1 font-semibold absolute -top-3 left-0">
+                          Line B Target (100 UPH)
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {data.map(item => {
-                  const maxChartUph = 150;
+                  const maxChartUph = Math.max(...data.flatMap(d => [d.lineAUph, d.lineBUph]), 175);
                   const heightPctA = Math.min(100, (item.lineAUph / maxChartUph) * 100);
                   const heightPctB = Math.min(100, (item.lineBUph / maxChartUph) * 100);
 

@@ -12,13 +12,13 @@ import {
 } from '../types/oec';
 
 export const UPPH_DEFAULT_TARGETS = {
-  lineA: 1.22,
-  lineB: 0.96,
-  factory: 1.09,
+  lineA: 18.0,
+  lineB: 15.0,
+  factory: 16.5,
 };
 
 /**
- * Baseline headcount (On-the-job / Attendance) per production line by month.
+ * Baseline daily headcount (Manpower) per production line by month.
  * Total Attendance matches INITIAL_SUMMARY_PERFORMANCE_DATA (202-225),
  * and Sep 2026 matches the original UPPH sheet (Line A = 119, Line B = 93 -> Total 212).
  */
@@ -30,49 +30,49 @@ export const MONTH_LINE_HEADCOUNT_DEFAULTS: Record<
   }
 > = {
   '2026-01': {
-    lineA: { onTheJob: 130, attendance: 121, targetUpph: 1.22 },
-    lineB: { onTheJob: 99, attendance: 94, targetUpph: 0.96 },
+    lineA: { onTheJob: 130, attendance: 121, targetUpph: 18.0 },
+    lineB: { onTheJob: 99, attendance: 94, targetUpph: 15.0 },
   },
   '2026-02': {
-    lineA: { onTheJob: 131, attendance: 122, targetUpph: 1.22 },
-    lineB: { onTheJob: 101, attendance: 96, targetUpph: 0.96 },
+    lineA: { onTheJob: 131, attendance: 122, targetUpph: 18.0 },
+    lineB: { onTheJob: 101, attendance: 96, targetUpph: 15.0 },
   },
   '2026-03': {
-    lineA: { onTheJob: 132, attendance: 123, targetUpph: 1.22 },
-    lineB: { onTheJob: 102, attendance: 97, targetUpph: 0.96 },
+    lineA: { onTheJob: 132, attendance: 123, targetUpph: 18.0 },
+    lineB: { onTheJob: 102, attendance: 97, targetUpph: 15.0 },
   },
   '2026-04': {
-    lineA: { onTheJob: 129, attendance: 120, targetUpph: 1.22 },
-    lineB: { onTheJob: 99, attendance: 94, targetUpph: 0.96 },
+    lineA: { onTheJob: 129, attendance: 120, targetUpph: 18.0 },
+    lineB: { onTheJob: 99, attendance: 94, targetUpph: 15.0 },
   },
   '2026-05': {
-    lineA: { onTheJob: 134, attendance: 125, targetUpph: 1.22 },
-    lineB: { onTheJob: 102, attendance: 97, targetUpph: 0.96 },
+    lineA: { onTheJob: 134, attendance: 125, targetUpph: 18.0 },
+    lineB: { onTheJob: 102, attendance: 97, targetUpph: 15.0 },
   },
   '2026-06': {
-    lineA: { onTheJob: 135, attendance: 126, targetUpph: 1.22 },
-    lineB: { onTheJob: 104, attendance: 99, targetUpph: 0.96 },
+    lineA: { onTheJob: 135, attendance: 126, targetUpph: 18.0 },
+    lineB: { onTheJob: 104, attendance: 99, targetUpph: 15.0 },
   },
   '2026-07': {
     // July: Line A stopped after Day 1 for Retooling; Line B took full capacity
-    lineA: { onTheJob: 108, attendance: 104, targetUpph: 1.22 },
-    lineB: { onTheJob: 102, attendance: 98, targetUpph: 0.96 },
+    lineA: { onTheJob: 108, attendance: 104, targetUpph: 18.0 },
+    lineB: { onTheJob: 102, attendance: 98, targetUpph: 15.0 },
   },
   '2026-08': {
-    lineA: { onTheJob: 130, attendance: 121, targetUpph: 1.22 },
-    lineB: { onTheJob: 99, attendance: 94, targetUpph: 0.96 },
+    lineA: { onTheJob: 130, attendance: 121, targetUpph: 18.0 },
+    lineB: { onTheJob: 99, attendance: 94, targetUpph: 15.0 },
   },
   '2026-09': {
-    lineA: { onTheJob: 129, attendance: 119, targetUpph: 1.22 },
-    lineB: { onTheJob: 97, attendance: 93, targetUpph: 0.96 },
+    lineA: { onTheJob: 129, attendance: 119, targetUpph: 18.0 },
+    lineB: { onTheJob: 97, attendance: 93, targetUpph: 15.0 },
   },
   '2026-10': {
-    lineA: { onTheJob: 128, attendance: 119, targetUpph: 1.22 },
-    lineB: { onTheJob: 97, attendance: 93, targetUpph: 0.96 },
+    lineA: { onTheJob: 128, attendance: 119, targetUpph: 18.0 },
+    lineB: { onTheJob: 97, attendance: 93, targetUpph: 15.0 },
   },
   '2026-11': {
-    lineA: { onTheJob: 128, attendance: 119, targetUpph: 1.22 },
-    lineB: { onTheJob: 97, attendance: 93, targetUpph: 0.96 },
+    lineA: { onTheJob: 128, attendance: 119, targetUpph: 18.0 },
+    lineB: { onTheJob: 97, attendance: 93, targetUpph: 15.0 },
   },
 };
 
@@ -83,35 +83,31 @@ export const getLineDefaultsForMonth = (monthKey: string, prodLine: string) => {
     return isLineA ? monthCfg.lineA : monthCfg.lineB;
   }
   return isLineA
-    ? { onTheJob: 128, attendance: 119, targetUpph: 1.22 }
-    : { onTheJob: 97, attendance: 93, targetUpph: 0.96 };
+    ? { onTheJob: 128, attendance: 119, targetUpph: UPPH_DEFAULT_TARGETS.lineA }
+    : { onTheJob: 97, attendance: 93, targetUpph: UPPH_DEFAULT_TARGETS.lineB };
 };
 
 /**
- * Core daily UPPH formula: Act / (WorkTime * Attendance)
+ * Core direct daily UPPH formula: Daily Output ÷ Daily Manpower (no other factors)
  */
 export const calculateDailyActUpph = (
   act: number | null | undefined,
-  workTime: number | null | undefined,
-  attendance: number | null | undefined
+  manpower: number | null | undefined
 ): number | null => {
   if (
     act === null ||
     act === undefined ||
-    workTime === null ||
-    workTime === undefined ||
-    attendance === null ||
-    attendance === undefined
+    manpower === null ||
+    manpower === undefined
   ) {
     return null;
   }
   const a = Number(act);
-  const wt = Number(workTime);
-  const att = Number(attendance);
-  if (!isFinite(a) || !isFinite(wt) || !isFinite(att) || wt <= 0 || att <= 0 || a <= 0) {
+  const mp = Number(manpower);
+  if (!isFinite(a) || !isFinite(mp) || a <= 0 || mp <= 0) {
     return null;
   }
-  return Number((a / (wt * att)).toFixed(2));
+  return Number((a / mp).toFixed(2));
 };
 
 export interface LinePeriodUpphSummary {
@@ -120,6 +116,9 @@ export interface LinePeriodUpphSummary {
   uph: number;
   avgOnTheJob: number;
   avgAttendance: number;
+  totalManpower: number;
+  coveredAct: number;
+  coveredManpower: number;
   totalManHours: number;
   totalTargetUpph: number;
   totalActUpph: number;
@@ -127,9 +126,8 @@ export interface LinePeriodUpphSummary {
 }
 
 /**
- * Calculate full period UPPH summary for a line strictly from its Daily OEC data & UPPH attendance.
- * Period UPPH = Total Act / Total Man-Hours (where Man-Hours = sum(WorkTime_d * Attendance_d)),
- * falling back to Total Act / (Total WorkHours * Avg Attendance) when daily attendance is uniform or partial.
+ * Calculate full period UPPH summary for a line strictly from Daily Output ÷ Daily Manpower.
+ * Period UPPH = Sum(Daily Output where Manpower > 0) ÷ Sum(Daily Manpower where Output > 0).
  */
 export const calculateLinePeriodUpph = (
   days: DayColumn[],
@@ -143,8 +141,9 @@ export const calculateLinePeriodUpph = (
 
   let totalAct = 0;
   let totalWorkHours = 0;
-  let totalManHours = 0;
-  let hoursCoveredByAtt = 0;
+  let totalManpower = 0;
+  let coveredAct = 0;
+  let coveredManpower = 0;
 
   days.forEach(d => {
     const otj = upphLine.onTheJob?.[d.day];
@@ -156,6 +155,7 @@ export const calculateLinePeriodUpph = (
     }
     if (att !== null && att !== undefined && !isNaN(Number(att)) && Number(att) > 0) {
       attVals.push(Number(att));
+      totalManpower += Number(att);
     }
     if (tgt !== null && tgt !== undefined && !isNaN(Number(tgt))) {
       tgtVals.push(Number(tgt));
@@ -168,13 +168,21 @@ export const calculateLinePeriodUpph = (
     }
     if (wt !== null && wt !== undefined && !isNaN(Number(wt)) && Number(wt) > 0) {
       totalWorkHours += Number(wt);
-      if (att !== null && att !== undefined && Number(att) > 0) {
-        totalManHours += Number(wt) * Number(att);
-        hoursCoveredByAtt += Number(wt);
-      }
     }
 
-    const dayUpph = calculateDailyActUpph(act, wt, att);
+    if (
+      act !== null &&
+      act !== undefined &&
+      Number(act) > 0 &&
+      att !== null &&
+      att !== undefined &&
+      Number(att) > 0
+    ) {
+      coveredAct += Number(act);
+      coveredManpower += Number(att);
+    }
+
+    const dayUpph = calculateDailyActUpph(act, att);
     if (dayUpph !== null) {
       dailyActUpph[d.day] = dayUpph;
     } else if (!oecLine && upphLine.actUpph?.[d.day] != null) {
@@ -197,7 +205,9 @@ export const calculateLinePeriodUpph = (
       : 0;
 
   const totalTargetUpph =
-    upphLine.totalTargetUpphOverride !== undefined && upphLine.totalTargetUpphOverride !== null
+    upphLine.totalTargetUpphOverride !== undefined &&
+    upphLine.totalTargetUpphOverride !== null &&
+    upphLine.totalTargetUpphOverride >= 5
       ? upphLine.totalTargetUpphOverride
       : tgtVals.length > 0
       ? Number((tgtVals.reduce((a, b) => a + b, 0) / tgtVals.length).toFixed(2))
@@ -210,11 +220,11 @@ export const calculateLinePeriodUpph = (
   let totalActUpph = 0;
   if (upphLine.totalActUpphOverride !== undefined && upphLine.totalActUpphOverride !== null) {
     totalActUpph = Number(upphLine.totalActUpphOverride);
-  } else if (totalAct > 0 && hoursCoveredByAtt > 0 && hoursCoveredByAtt === totalWorkHours && totalManHours > 0) {
-    // True Total Units / Total Direct Man-Hours
-    totalActUpph = Number((totalAct / totalManHours).toFixed(2));
-  } else if (totalAct > 0 && totalWorkHours > 0 && avgAttendance > 0) {
-    totalActUpph = Number((totalAct / (totalWorkHours * avgAttendance)).toFixed(2));
+  } else if (coveredAct > 0 && coveredManpower > 0) {
+    // Exact Sum(Daily Output) / Sum(Daily Manpower)
+    totalActUpph = Number((coveredAct / coveredManpower).toFixed(2));
+  } else if (totalAct > 0 && totalManpower > 0) {
+    totalActUpph = Number((totalAct / totalManpower).toFixed(2));
   } else {
     const fallbackVals = Object.values(dailyActUpph).filter(
       (v): v is number => v !== null && v !== undefined && !isNaN(Number(v))
@@ -232,7 +242,10 @@ export const calculateLinePeriodUpph = (
     uph,
     avgOnTheJob,
     avgAttendance,
-    totalManHours: Number(totalManHours.toFixed(1)),
+    totalManpower,
+    coveredAct,
+    coveredManpower,
+    totalManHours: totalManpower,
     totalTargetUpph,
     totalActUpph,
     dailyActUpph,
@@ -241,8 +254,8 @@ export const calculateLinePeriodUpph = (
 
 /**
  * Synchronize or generate a UPPH matrix (days + lines) for a specific month from its Daily OEC data.
- * Preserves existing user attendance / targetUpph edits per day while populating missing working days
- * and recalculating Act UPPH(实际) = Daily Act / (WorkTime * Attendance).
+ * Preserves existing user Manpower edits per day while populating missing working days
+ * and recalculating Act UPPH = Daily Output ÷ Daily Manpower.
  */
 export const buildUpphMatrixForPeriod = (
   monthKey: string,
@@ -267,10 +280,7 @@ export const buildUpphMatrixForPeriod = (
     days.forEach(d => {
       const day = d.day;
       const actVal = oecLine.act?.[day];
-      const wtVal = oecLine.workTime?.[day];
-      const hasProduction =
-        (actVal !== null && actVal !== undefined && Number(actVal) > 0) ||
-        (wtVal !== null && wtVal !== undefined && Number(wtVal) > 0);
+      const hasProduction = actVal !== null && actVal !== undefined && Number(actVal) > 0;
 
       const prevOtj = existingLine?.onTheJob?.[day];
       const prevAtt = existingLine?.attendance?.[day];
@@ -282,23 +292,27 @@ export const buildUpphMatrixForPeriod = (
         onTheJob[day] = defaults.onTheJob;
       }
 
-      if (prevAtt !== undefined && prevAtt !== null) {
+      if (prevAtt !== undefined) {
         attendance[day] = prevAtt;
       } else if (hasProduction) {
         attendance[day] = defaults.attendance;
       }
 
+      // Upgrade stale old per-hour target (< 5) to direct Output/Manpower target
       targetUpph[day] =
-        prevTgt !== undefined && prevTgt !== null ? prevTgt : defaults.targetUpph;
+        prevTgt !== undefined && prevTgt !== null && Number(prevTgt) >= 5
+          ? prevTgt
+          : defaults.targetUpph;
 
-      const calcUpph = calculateDailyActUpph(actVal, wtVal, attendance[day]);
+      const calcUpph = calculateDailyActUpph(actVal, attendance[day]);
       if (calcUpph !== null) {
         actUpph[day] = calcUpph;
-      } else if (existingLine?.actUpph?.[day] !== undefined && !hasProduction) {
+      } else if (existingLine?.actUpph?.[day] !== undefined) {
         actUpph[day] = null;
       }
     });
 
+    const prevTargetOverride = existingLine?.totalTargetUpphOverride;
     return {
       id: oecLine.id,
       plant: oecLine.plant,
@@ -309,7 +323,10 @@ export const buildUpphMatrixForPeriod = (
       actUpph,
       totalOnTheJobOverride: null,
       totalAttendanceOverride: null,
-      totalTargetUpphOverride: existingLine?.totalTargetUpphOverride ?? null,
+      totalTargetUpphOverride:
+        prevTargetOverride !== undefined && prevTargetOverride !== null && prevTargetOverride >= 5
+          ? prevTargetOverride
+          : null,
       totalActUpphOverride: null,
     };
   });
@@ -322,7 +339,7 @@ export const buildUpphMatrixForPeriod = (
 };
 
 /**
- * Rebuild monthlyData (Line A/B Prod & UPPH) across all months strictly from Daily OEC periodData + monthlyEfficiency + per-month matrices.
+ * Rebuild monthlyData (Line A/B Prod & UPPH) across all months strictly from Daily OEC Output ÷ Daily Manpower.
  */
 export const computeAllMonthsUpph = (
   periodData: PeriodStorageState,
@@ -387,13 +404,9 @@ export const computeAllMonthsUpph = (
       const defA = getLineDefaultsForMonth(monthKey, 'Line A');
       const defB = getLineDefaultsForMonth(monthKey, 'Line B');
       const upphA =
-        effRow.lineAWorkHours > 0 && defA.attendance > 0
-          ? Number((effRow.lineAAct / (effRow.lineAWorkHours * defA.attendance)).toFixed(2))
-          : 0;
+        defA.attendance > 0 ? Number((effRow.lineAAct / defA.attendance).toFixed(2)) : 0;
       const upphB =
-        effRow.lineBWorkHours > 0 && defB.attendance > 0
-          ? Number((effRow.lineBAct / (effRow.lineBWorkHours * defB.attendance)).toFixed(2))
-          : 0;
+        defB.attendance > 0 ? Number((effRow.lineBAct / defB.attendance).toFixed(2)) : 0;
       monthlyData.push({
         month: monthKey,
         prodLineA: effRow.lineAAct,
@@ -456,6 +469,9 @@ export const syncSummaryPerformanceWithOecAndUpph = (
     const matrix = upphSheet.periodMatrices?.[row.period];
 
     const next = { ...row };
+    if (!next.targetUpph || next.targetUpph < 5) {
+      next.targetUpph = UPPH_DEFAULT_TARGETS.factory;
+    }
 
     if (oecEntry && oecEntry.lines?.length > 0 && oecEntry.days?.length > 0) {
       const oecA =
@@ -500,7 +516,7 @@ export const syncSummaryPerformanceWithOecAndUpph = (
       next.lineAUpph = upphMatch.upphLineA;
       next.lineBUpph = upphMatch.upphLineB;
 
-      // Compute weighted factory UPPH = Total Act / Total Man-Hours across Line A + Line B
+      // Plant UPPH = Total Output / Total Manpower across Line A + Line B
       if (matrix && oecEntry) {
         const oecA =
           oecEntry.lines.find(l => l.prodLine.toLowerCase().includes('a')) || oecEntry.lines[0];
@@ -512,10 +528,14 @@ export const syncSummaryPerformanceWithOecAndUpph = (
           matrix.lines.find(l => l.prodLine.toLowerCase().includes('b')) || matrix.lines[1];
         const sumA = uA ? calculateLinePeriodUpph(matrix.days, oecA, uA) : null;
         const sumB = uB ? calculateLinePeriodUpph(matrix.days, oecB, uB) : null;
-        const totManHrs = (sumA?.totalManHours || 0) + (sumB?.totalManHours || 0);
-        const totAct = (sumA?.totalAct || 0) + (sumB?.totalAct || 0);
-        if (totManHrs > 0) {
-          next.avgUpph = Number((totAct / totManHrs).toFixed(2));
+        const totCoveredMp =
+          (sumA?.coveredManpower || sumA?.totalManpower || 0) +
+          (sumB?.coveredManpower || sumB?.totalManpower || 0);
+        const totCoveredAct =
+          (sumA?.coveredAct || sumA?.totalAct || 0) +
+          (sumB?.coveredAct || sumB?.totalAct || 0);
+        if (totCoveredMp > 0) {
+          next.avgUpph = Number((totCoveredAct / totCoveredMp).toFixed(2));
         } else {
           next.avgUpph = Number(((upphMatch.upphLineA + upphMatch.upphLineB) / 2).toFixed(2));
         }
