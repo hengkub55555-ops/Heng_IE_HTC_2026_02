@@ -3,6 +3,7 @@ export type CategoryType = 'Planning' | 'Act' | 'Gap' | 'Work Time' | 'UPH';
 export type ActiveSheetTab =
   | 'daily-oec'
   | 'summary-onepage'
+  | 'summary-dashboard-performance'
   | 'upph-oec'
   | 'line-idle'
   | 'summary-performance'

@@ -197,6 +197,7 @@ export const INITIAL_NOV_2026_DAYS: DayColumn[] = [
   { day: 15, weekday: 'SUN' },
   { day: 16, weekday: 'MON' },
   { day: 17, weekday: 'TUE' },
+  { day: 18, weekday: 'WEN' },
 ];
 
 export const INITIAL_NOV_2026_LINES: LineOECData[] = [
@@ -206,15 +207,15 @@ export const INITIAL_NOV_2026_LINES: LineOECData[] = [
     prodLine: 'Line A',
     planning: {
       2: 16644, 3: 1906, 4: 2613, 5: 3718, 6: 5300, 7: null,
-      9: 966, 10: 2037, 11: 2745, 12: 3454, 13: 5400, 14: null, 15: null, 16: 2512, 17: 4198,
+      9: 966, 10: 2037, 11: 2745, 12: 3454, 13: 5400, 14: null, 15: null, 16: 2512, 17: 4198, 18: 4891,
     },
     act: {
       2: 1721, 3: 3600, 4: 3611, 5: 3678, 6: 3575, 7: 3205,
-      9: 3662, 10: 3632, 11: 3655, 12: 3476, 13: 3486, 14: 3258, 15: 1781, 16: 3754, 17: 3442,
+      9: 3662, 10: 3632, 11: 3655, 12: 3476, 13: 3486, 14: 3258, 15: 1781, 16: 3754, 17: 3442, 18: 3383,
     },
     workTime: {
       2: 16, 3: 21, 4: 21, 5: 21, 6: 21, 7: 21,
-      9: 21, 10: 21, 11: 21, 12: 21, 13: 21, 14: 21, 15: 11, 16: 21, 17: 19,
+      9: 21, 10: 21, 11: 21, 12: 21, 13: 21, 14: 21, 15: 11, 16: 21, 17: 21, 18: 19,
     },
   },
   {
@@ -223,15 +224,15 @@ export const INITIAL_NOV_2026_LINES: LineOECData[] = [
     prodLine: 'Line B',
     planning: {
       2: 7075, 3: 1708, 4: 1747, 5: 2381, 6: 2599, 7: null,
-      9: 734, 10: 3086, 11: 2270, 12: 2371, 13: 3230, 14: null, 15: null, 16: 2254, 17: 2679,
+      9: 734, 10: 3086, 11: 2270, 12: 2371, 13: 3230, 14: null, 15: null, 16: 2254, 17: 2679, 18: 2106,
     },
     act: {
       2: 1360, 3: 2418, 4: 2410, 5: 2350, 6: 1852, 7: 1962,
-      9: 2346, 10: 2095, 11: 2355, 12: 2241, 13: 2261, 14: 2152, 15: 1510, 16: 2185, 17: 2164,
+      9: 2346, 10: 2095, 11: 2355, 12: 2241, 13: 2261, 14: 2152, 15: 1510, 16: 2185, 17: 2164, 18: 1960,
     },
     workTime: {
       2: 14, 3: 21, 4: 21, 5: 21, 6: 21, 7: 21,
-      9: 21, 10: 21, 11: 21, 12: 21, 13: 21, 14: 21, 15: 20, 16: 21, 17: 18,
+      9: 21, 10: 21, 11: 21, 12: 21, 13: 21, 14: 21, 15: 20, 16: 21, 17: 21, 18: 19,
     },
   },
 ];
@@ -911,7 +912,7 @@ export const INITIAL_PERIOD_DATA: PeriodStorageState = {
   '2026-11': {
     lines: INITIAL_NOV_2026_LINES,
     days: INITIAL_NOV_2026_DAYS,
-    updatedAt: '2026-11-17T18:00:00.000Z',
+    updatedAt: '2026-11-18T18:00:00.000Z',
     note: 'ข้อมูลประจำเดือน 2026-11 (พฤศจิกายน)',
   },
 };
@@ -927,7 +928,7 @@ export const INITIAL_MONTHLY_PRODUCTION: MonthlyTrendItem[] = [
   { month: '2026-08', lineA: 40339, lineB: 50071 },
   { month: '2026-09', lineA: 63252, lineB: 45602 },
   { month: '2026-10', lineA: 65587, lineB: 47380 },
-  { month: '2026-11', lineA: 49536, lineB: 31661 },
+  { month: '2026-11', lineA: 52919, lineB: 33621 },
 ];
 
 export const INITIAL_MONTHLY_UPH: MonthlyTrendItem[] = [
@@ -941,7 +942,7 @@ export const INITIAL_MONTHLY_UPH: MonthlyTrendItem[] = [
   { month: '2026-08', lineA: 98, lineB: 100 },
   { month: '2026-09', lineA: 127, lineB: 95 },
   { month: '2026-10', lineA: 136, lineB: 96 },
-  { month: '2026-11', lineA: 166, lineB: 104 },
+  { month: '2026-11', lineA: 166, lineB: 103 },
 ];
 
 export const INITIAL_ACTION_ITEMS: ActionItem[] = [
@@ -1128,17 +1129,17 @@ export const INITIAL_MONTHLY_EFFICIENCY: MonthlyEfficiencyRow[] = [
   {
     month: '2026-11',
     monthNameTh: 'พ.ย. 2026',
-    lineAPlan: 51493,
-    lineAAct: 49536,
+    lineAPlan: 56384,
+    lineAAct: 52919,
     lineAUph: 166,
     lineATargetUph: 110,
-    lineAWorkHours: 298,
-    lineBPlan: 32134,
-    lineBAct: 31661,
-    lineBUph: 104,
+    lineAWorkHours: 319,
+    lineBPlan: 34240,
+    lineBAct: 33621,
+    lineBUph: 103,
     lineBTargetUph: 100,
-    lineBWorkHours: 304,
-    notes: 'ข้อมูล พ.ย. 2026 (วันที่ 2-17) ยอดผลิตรวม 81,197 ตัว (Plan 83,627, Line A UPH 166, Line B UPH 104)',
+    lineBWorkHours: 326,
+    notes: 'ข้อมูล พ.ย. 2026 (วันที่ 2-18) ยอดผลิตรวม 86,540 ตัว (Plan 90,624, Line A UPH 166, Line B UPH 103)',
   },
 ];
 
@@ -2026,12 +2027,12 @@ const BASE_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
     id: 'sp-2026-11',
     period: '2026-11',
     periodLabelTh: 'พ.ย. 2026 (MTD)',
-    totalPlan: 83627,
-    totalAct: 81197,
-    workHours: 602,
+    totalPlan: 90624,
+    totalAct: 86540,
+    workHours: 645,
     lineAUph: 166,
-    lineBUph: 104,
-    avgUph: 135,
+    lineBUph: 103,
+    avgUph: 134,
     targetUph: 105,
     lineAUpph: 1.05,
     lineBUpph: 1.12,
@@ -2045,7 +2046,7 @@ const BASE_SUMMARY_PERFORMANCE_DATA: SummaryPerformanceRow[] = [
     idleOver5MinHours: 0,
     idleOver5MinRate: 0,
     targetIdleRate: 7.0,
-    notes: 'ข้อมูลล่าสุด พ.ย. 2026 (วันที่ 2-17) ยอดผลิตรวม 81,197 ตัว, UPH โรงงาน 135 (Line A 166)',
+    notes: 'ข้อมูลล่าสุด พ.ย. 2026 (วันที่ 2-18) ยอดผลิตรวม 86,540 ตัว, UPH โรงงาน 134 (Line A 166)',
   },
 ];
 

@@ -71,6 +71,7 @@ import { UpphOecView } from './components/UpphOecView';
 import { LineIdleTimeView } from './components/LineIdleTimeView';
 import { SummaryPerformanceView } from './components/SummaryPerformanceView';
 import { SummaryOnepageDashboardView } from './components/SummaryOnepageDashboardView';
+import { SummaryDashboardPerformanceView } from './components/SummaryDashboardPerformanceView';
 import { useAppPreferences } from './contexts/AppPreferencesContext';
 import { downloadOECTemplate, exportToCSV } from './utils/excelHelper';
 import {
@@ -102,7 +103,7 @@ export default function App() {
   const STORAGE_KEY_LINE_IDLE = 'oec_line_idle_sheet_v1';
   const STORAGE_KEY_SUMMARY_PERF = 'oec_summary_perf_v1';
   const STORAGE_KEY_OCT_SEEDED = 'oec_oct_2026_seeded_v1';
-  const STORAGE_KEY_NOV_SEEDED = 'oec_nov_2026_seeded_v3';
+  const STORAGE_KEY_NOV_SEEDED = 'oec_nov_2026_seeded_v4';
   const STORAGE_KEY_SEP_SEEDED = 'oec_sep_2026_full_v2';
   const STORAGE_KEY_AUG_SEEDED = 'oec_aug_2026_seeded_v1';
   const STORAGE_KEY_JUL_SEEDED = 'oec_jul_2026_seeded_v1';
@@ -132,8 +133,8 @@ export default function App() {
   const hasFullNovemberData = (entry?: { days?: DayColumn[]; lines?: LineOECData[] }) => {
     return Boolean(
       entry?.days?.some(d => d.day === 2) &&
-      entry?.days?.some(d => d.day === 16) &&
       entry?.days?.some(d => d.day === 17) &&
+      entry?.days?.some(d => d.day === 18) &&
       hasPeriodActualData(entry)
     );
   };
@@ -289,8 +290,8 @@ export default function App() {
       (m01 && (m01.upphLineA < 5 || m01.upphLineB < 5)) ||
       (m07 && m07.upphLineB < 5) ||
       (m09 && (m09.prodLineA === 58976 || m09.upphLineA < 5 || m09.upphLineB < 5)) ||
-      !novMatrix?.days?.some(d => d.day === 17) ||
-      (m11 && m11.prodLineA === 42340)
+      !novMatrix?.days?.some(d => d.day === 18) ||
+      (m11 && (m11.prodLineA === 42340 || m11.prodLineA === 49536))
     );
   };
 
@@ -346,7 +347,9 @@ export default function App() {
       (r01 && (r01.lineAUpph < 5 || r01.targetUpph < 5)) ||
       (r07 && (r07.lineBUpph < 5 || r07.targetUpph < 5)) ||
       (r09 && (r09.lineAUpph < 5 || r09.targetUpph < 5 || r09.totalAct === 101779)) ||
-      (r11 && r11.totalPlan === 71984 && (r11.totalAct === 60920 || r11.totalAct === 69649))
+      (r11 &&
+        ((r11.totalPlan === 71984 && (r11.totalAct === 60920 || r11.totalAct === 69649)) ||
+          (r11.totalPlan === 83627 && r11.totalAct === 81197)))
     );
   };
 
@@ -388,7 +391,10 @@ export default function App() {
             ((existing.lineAAct === 37296 && existing.lineBAct === 23624) ||
               (existing.lineAAct === 42340 &&
                 existing.lineBAct === 27309 &&
-                existing.lineAPlan === 44783))))
+                existing.lineAPlan === 44783) ||
+              (existing.lineAAct === 49536 &&
+                existing.lineBAct === 31661 &&
+                existing.lineAPlan === 51493))))
       ) {
         map.set(mKey, initRow);
       }
@@ -642,8 +648,9 @@ export default function App() {
           if (idx === -1) {
             parsed = [...parsed, initNov];
           } else if (
-            parsed[idx].totalPlan === 71984 &&
-            (parsed[idx].totalAct === 60920 || parsed[idx].totalAct === 69649)
+            (parsed[idx].totalPlan === 71984 &&
+              (parsed[idx].totalAct === 60920 || parsed[idx].totalAct === 69649)) ||
+            (parsed[idx].totalPlan === 83627 && parsed[idx].totalAct === 81197)
           ) {
             parsed = parsed.map((r, i) => (i === idx ? initNov : r));
           }
@@ -1128,8 +1135,8 @@ export default function App() {
             mergedSummary = mergedSummary.some(r => r.period === '2026-11')
               ? mergedSummary.map(r =>
                   r.period === '2026-11' &&
-                  r.totalPlan === 71984 &&
-                  (r.totalAct === 60920 || r.totalAct === 69649)
+                  ((r.totalPlan === 71984 && (r.totalAct === 60920 || r.totalAct === 69649)) ||
+                    (r.totalPlan === 83627 && r.totalAct === 81197))
                     ? initNovSummary
                     : r
                 )
@@ -2330,6 +2337,33 @@ export default function App() {
             onNavigateToSheet={(tab) => setActiveTab(tab)}
             onSaveOnWeb={() => handleSaveOnWebNow()}
             onOpenPresentation={() => setShowPresentationModal(true)}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isSyncing={isSyncing}
+          />
+        ) : activeTab === 'summary-dashboard-performance' ? (
+          /* Summary Dashboard Performance: Multi-Dimensional Interactive Pie & Donut Analytics */
+          <SummaryDashboardPerformanceView
+            monthlyEfficiency={dynamicMonthlyEfficiency}
+            summaryPerformance={summaryPerformance}
+            upphSheet={upphSheet}
+            lineIdleSheet={lineIdleSheet}
+            periodData={periodData}
+            activePeriodKey={activePeriodKey}
+            activeLines={filteredLines}
+            activeDays={days}
+            actionItems={actionItems}
+            plantName={filters.plant === 'ทั้งหมด' ? 'HTC Ref(泰国冰箱)' : filters.plant}
+            year={filters.year}
+            onSelectPeriod={(periodKey) => {
+              const [yPart] = periodKey.split('-');
+              handleFilterChange({
+                ...filters,
+                year: parseInt(yPart || String(filters.year), 10),
+                month: periodKey,
+              });
+            }}
+            onNavigateToSheet={(tab) => setActiveTab(tab)}
+            onSaveOnWeb={() => handleSaveOnWebNow()}
             hasUnsavedChanges={hasUnsavedChanges}
             isSyncing={isSyncing}
           />

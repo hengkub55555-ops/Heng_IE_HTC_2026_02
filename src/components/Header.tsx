@@ -26,7 +26,8 @@ import {
   TrendingUp,
   Languages,
   Palette,
-  LayoutGrid
+  LayoutGrid,
+  PieChart
 } from 'lucide-react';
 import { OECFilterState, ActiveSheetTab, EditableCustomSheet } from '../types/oec';
 import { THAI_MONTHS } from '../utils/dateHelper';
@@ -487,6 +488,24 @@ export const Header: React.FC<HeaderProps> = ({
                   'Summary Onepage Dashboard (สรุปหน้าเดียว)',
                   'Summary Onepage Dashboard',
                   '一页式汇总看板 (Summary Onepage)'
+                )}
+              </span>
+            </button>
+
+            <button
+              onClick={() => onTabChange('summary-dashboard-performance')}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-t-md transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+                activeTab === 'summary-dashboard-performance'
+                  ? 'border-[#0070c0] text-[#0070c0] bg-blue-50/70 shadow-xs'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <PieChart className="w-4 h-4 text-[#0070c0]" />
+              <span>
+                {t(
+                  'Summary Dashboard Performance (Pie Chart ครบมิติ)',
+                  'Dashboard Performance (Pie Analytics)',
+                  '绩效总览看板 (饼图全维分析)'
                 )}
               </span>
             </button>
